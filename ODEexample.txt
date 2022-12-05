@@ -1,3 +1,5 @@
+namespace oc = ompl::control;
+
 void TempestODE (const oc::ODESolver::StateType& q, const oc::Control* control, oc::ODESolver::StateType& qdot)
 {
     //TempestODE - This function adapted for c++ from function provided by Professor Eric Frew. Adapted by Roland Ilyes
