@@ -1,0 +1,7 @@
+Goal 1: A motion planner to get the aircraft to some state in the air.
+- Aircraft dynamics
+    - Make aircraft dynamics
+    - Incorporate into OMPL
+- Empty environmnent (All states are valid)
+- Goal state somewhere
+- Control input limits
