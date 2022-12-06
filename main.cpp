@@ -179,7 +179,7 @@ bool plan()
 
         // Open file
         std::ofstream myfile;
-        myfile.open("OutputDataPath.txt");
+        myfile.open("OutputPath.data");
 
         // Print path to file
         og::PathGeometric path1(dynamic_cast<const og::PathGeometric &>(*pdef->getSolutionPath()));
