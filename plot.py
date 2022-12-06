@@ -18,8 +18,14 @@ def main():
     path = np.genfromtxt("./build/Debug/OutputPath.data", delimiter=" ")
 
     # Plotting
-    fig, axs = plt.subplots(4, 2, sharex=True)
+    fig = plt.figure()
+    ax = plt.axes(projection="3d")
     fig.tight_layout()
+
+    ax.plot3D(path[:, 0], path[:, 1], path[:, 2])
+    ax.set_xlabel("x Position")
+    ax.set_ylabel("y Position")
+    ax.set_zlabel("z Position")
 
     print(path)
 

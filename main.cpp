@@ -24,6 +24,7 @@ Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/geometric/PathGeometric.h>
 #include <ompl/base/Path.h>
+#include <ompl/base/StateSpace.h>
 
 #include <tempest.h>
 #include <barometric_formula.h>
@@ -128,8 +129,8 @@ bool plan()
 
     // Set bounds for state space
     ob::RealVectorBounds bounds(3);
-    bounds.setLow(-1); // TODO: make bounds realistic
-    bounds.setHigh(1);
+    bounds.setLow(-100); // TODO: make bounds realistic
+    bounds.setHigh(100);
 
     space->setBounds(bounds);
 
@@ -139,13 +140,18 @@ bool plan()
     // Add the validity checker
     si->setStateValidityChecker(isStateValid);
 
-    // Add the start location
+    // Add the start and goal location
     ob::ScopedState<> start(space);
-    start.random(); // TODO: make it not random
+    start.random();
+    start[0] = -50;
+    start[1] = -50;
+    start[2] = -50;
 
-    // Add end location
     ob::ScopedState<> goal(space);
-    goal.random(); // TODO: make it not random
+    goal.random();
+    goal[0] = 0;
+    goal[1] = 0;
+    goal[2] = 0;
 
     // Loading variables into the problem definition
     // Create prob def variable
