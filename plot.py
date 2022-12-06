@@ -3,14 +3,33 @@ By: Benjamin Chupik
 
 Plots the generated path from the main.cpp run
 
+
+Data file structure:
+    [x_pos, y_pos, z_pos, x_quat, y_quat, z_quat, w_quat]
+
 """
 
-import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
-# import path
-path = np.genfromtxt("./build/Debug/OutputPath.data", delimiter=" ")
 
-# Delete last colum becuse of extra added space
+def main():
+    # import path
+    path = np.genfromtxt("./build/Debug/OutputPath.data", delimiter=" ")
 
-print(path)
+    # Plotting
+    fig, axs = plt.subplots(4, 2, sharex=True)
+    fig.tight_layout()
+
+    print(path)
+
+    # PLotting
+
+
+# -----------------------------------------------------------------------------------------------------
+# Have main at the bottom call so functions are all declared
+# -----------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
+
+    plt.show()
