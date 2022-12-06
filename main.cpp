@@ -18,8 +18,12 @@ Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
 #include <ompl/control/SimpleSetup.h>
 #include <ompl/config.h>
 #include <iostream>
+#include <fstream>
 #include <valarray>
 #include <limits>
+#include <ompl/geometric/planners/rrt/RRTConnect.h>
+#include <ompl/geometric/PathGeometric.h>
+#include <ompl/base/Path.h>
 
 #include <tempest.h>
 #include <barometric_formula.h>
@@ -27,6 +31,7 @@ Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
 // Name Spaces
 namespace ob = ompl::base;
 namespace oc = ompl::control;
+namespace og = ompl::geometric;
 
 //--------------------------------------------------------------------
 // Support Functions
@@ -116,7 +121,7 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 //--------------------------------------------------------------------
 // Planner
 //--------------------------------------------------------------------
-void plan()
+bool plan()
 {
     // construct the state space we are planning in
     auto space(std::make_shared<ob::SE3StateSpace>());
@@ -148,7 +153,48 @@ void plan()
     // Load vars into prob def
     pdef->setStartAndGoalStates(start, goal);
 
-    // Create planner object
+    // Create planner (RRT)
+    auto planner(std::make_shared<og::RRTConnect>(si));
+
+    // Add the problem to the planner
+    planner->setProblemDefinition(pdef);
+
+    // Finalize planner setup
+    planner->setup();
+
+    // Solve Problem
+    float maxSolveTime = 1.0; // Maximum time to spend on solving
+    ob::PlannerStatus solved = planner->ob::Planner::solve(maxSolveTime);
+
+    // If solution is solved:
+    if (solved)
+    {
+        // get the goal representation from the problem definition (not the same as the goal state)
+        // and inquire about the found path
+        ob::PathPtr path = pdef->getSolutionPath();
+        std::cout << "Found solution:" << std::endl;
+
+        // print the path to screen
+        // path->print(std::cout);
+
+        // Open file
+        std::ofstream myfile;
+        myfile.open("OutputDataPath.txt");
+
+        // Print path to file
+        og::PathGeometric path1(dynamic_cast<const og::PathGeometric &>(*pdef->getSolutionPath()));
+        // path1.printAsMatrix(std::cout); //output to terminal
+        path1.printAsMatrix(myfile);
+
+        // Close file
+
+        return true; // Return sucsess
+    }
+    else
+    {
+        std::cout << "No Path Found" << std::endl;
+        return false; // return a failure sence it didnt solve
+    }
 }
 
 //--------------------------------------------------------------------
@@ -156,7 +202,9 @@ void plan()
 //--------------------------------------------------------------------
 int main(int /*argc*/, char ** /*argv*/)
 {
-    std::cout << "Starting run" << std::endl;
+    std::cout << "Starting run\n";
+
+    plan();
 
     return 0;
 }
