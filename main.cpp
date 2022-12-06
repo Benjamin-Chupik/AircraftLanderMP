@@ -39,7 +39,17 @@ namespace og = ompl::geometric;
 //--------------------------------------------------------------------
 bool isStateValid(const ob::State *state)
 {
-    // TODO: add state validity checking
+    // cast the abstract state type to the type we expect
+    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
+
+    // extract the first component of the state and cast it to what we expect
+    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+
+    // extract the second component of the state and cast it to what we expect
+    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+    std::cout << pos->values[0] << "\n";
+
     return true;
 }
 
@@ -142,16 +152,16 @@ bool plan()
 
     // Add the start and goal location
     ob::ScopedState<> start(space);
-    start.random();
-    start[0] = -50;
-    start[1] = -50;
-    start[2] = -50;
+    start.random(); // To fill out all the states randomly (in case they arnt manualy set)
+    start[0] = -50; // Set x position
+    start[1] = -50; // Set y position
+    start[2] = -50; // Set z position
 
     ob::ScopedState<> goal(space);
-    goal.random();
-    goal[0] = 0;
-    goal[1] = 0;
-    goal[2] = 0;
+    goal.random(); // To fill out all the states randomly (in case they arnt manualy set)
+    goal[0] = 0;   // Set x position
+    goal[1] = 0;   // Set y position
+    goal[2] = 0;   // Set z position
 
     // Loading variables into the problem definition
     // Create prob def variable
