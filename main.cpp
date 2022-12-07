@@ -37,6 +37,8 @@ namespace oc = ompl::control;
 // This method is analogous to the above KinematicCarModel::ode function.
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
+    std::cout << "☺ \n"
+              << "x: " << q[0] << "y: " << q[1] << "z: " << q[2] << "\n";
     // TODO: hard coded the wind thing
     Eigen::Vector3d wind_inertial{0, 0, 0};
 
@@ -111,7 +113,7 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
     // Casat to data type
-    ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
+    // ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
     // ompl::base::SO2StateSpace::StateType &roll = *s[3]->as<ompl::base::SO2StateSpace::StateType>();
 
     //  Normalize orientation between 0 and 2*pi
@@ -120,9 +122,9 @@ void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control 
     // std::cout << reinterpret_cast<void *>(roll) << std::endl;
     // ob::SE3StateSpace r = result->as<ob::CompoundState>()[0];
     std::cout << "preNorm2\n";
-    SO2.enforceBounds(result->as<ob::CompoundState>()[0].as<ob::SE3StateSpace::StateType>(3));
-    SO2.enforceBounds(result->as<ob::CompoundState>()[0].as<ob::SE3StateSpace::StateType>(5));
-    SO2.enforceBounds(result->as<ob::CompoundState>()[0].as<ob::SE3StateSpace::StateType>(4));
+    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
+    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(4));
+    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(5));
     // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 
     std::cout << "postNorm\n";
@@ -157,7 +159,8 @@ void planWithSimpleSetup()
     // auto space(std::make_shared<ob::SE3StateSpace>());
     //  Make state space (R3, SO2x3, R6)
     // ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3));
-    auto r3(std::make_shared<ob::SE3StateSpace>());
+    // auto r3(std::make_shared<ob::SE3StateSpace>());
+    auto r3(std::make_shared<ob::RealVectorStateSpace>(3));
     // ob::StateSpacePtr so2(new ob::SO2StateSpace());
     auto so21(std::make_shared<ob::SO2StateSpace>());
     auto so22(std::make_shared<ob::SO2StateSpace>());
@@ -167,25 +170,34 @@ void planWithSimpleSetup()
 
     // Make Bounds
     ob::RealVectorBounds posbounds(3);
-    posbounds.setLow(-1);
-    posbounds.setHigh(1);
+    posbounds.setLow(-1000);
+    posbounds.setHigh(10000);
     r3->setBounds(posbounds);
+
     ob::RealVectorBounds velbounds(6);
-    velbounds.setLow(-1);
-    velbounds.setHigh(1);
+    velbounds.setLow(-1000);
+    velbounds.setHigh(10000);
     r6->setBounds(velbounds);
 
     // Combine smaller spaces into big main space
-    // ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
-    ob::StateSpacePtr space = r3 + r6;
+    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
 
     // create a control space
     auto cspace(std::make_shared<DemoControlSpace>(space));
 
     // set the bounds for the control space
     ob::RealVectorBounds cbounds(4); // 4 dim control space
-    cbounds.setLow(-0.3);
-    cbounds.setHigh(0.3);
+    cbounds.setLow(0, -.4);
+    cbounds.setHigh(0, .4);
+
+    cbounds.setLow(1, -.4);
+    cbounds.setHigh(1, .4);
+
+    cbounds.setLow(2, -.4);
+    cbounds.setHigh(2, .4);
+
+    cbounds.setLow(3, -50);
+    cbounds.setHigh(3, 100);
 
     cspace->setBounds(cbounds);
 
@@ -204,14 +216,47 @@ void planWithSimpleSetup()
 
     ob::ScopedState<> start(space);
     start.random();
+    start[0] = 0;
+    start[1] = 0;
+    start[2] = 2000;
+
+    start[3] = 0;
+    start[4] = 0;
+    start[5] = 0;
+
+    start[6] = 40;
+    start[7] = 0;
+    start[8] = 0;
+
+    start[9] = 0;
+    start[10] = 0;
+    start[11] = 0;
+
     ob::ScopedState<> goal(space);
     goal.random();
+    goal[0] = 0;
+    goal[1] = 0;
+    goal[2] = 2000;
+
+    goal[3] = 0;
+    goal[4] = 0;
+    goal[5] = 0;
+
+    goal[6] = 40;
+    goal[7] = 0;
+    goal[8] = 0;
+
+    goal[9] = 0;
+    goal[10] = 0;
+    goal[11] = 0;
     std::cout << "q";
-    ss.setStartAndGoalStates(start, goal, 0.05);
+    ss.setStartAndGoalStates(start, goal, 150);
 
     ss.setup();
 
     std::cout << "HERE\n";
+
+    ss.print();
 
     ob::PlannerStatus solved = ss.solve(100.0);
 
