@@ -13,7 +13,7 @@ Input Vector: [d_e, d_a, d_r, d_t] (elevator, aileron, ruder, thrust)
 // Program Setup
 //--------------------------------------------------------------------
 #include <ompl/control/SpaceInformation.h>
-//#include <ompl/extensions/ode/OpenDEStateSpace.h>
+// #include <ompl/extensions/ode/OpenDEStateSpace.h>
 #include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
@@ -37,8 +37,7 @@ namespace oc = ompl::control;
 // This method is analogous to the above KinematicCarModel::ode function.
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
-    std::cout << "☺ \n"
-              << "x: " << q[0] << "y: " << q[1] << "z: " << q[2] << "\n";
+
     // TODO: hard coded the wind thing
     Eigen::Vector3d wind_inertial{0, 0, 0};
 
@@ -50,6 +49,10 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     // cast control to the type we expect
     const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
     // notes: reference u[0] to u[3], elevator, aileron, rudder, throttle
+
+    std::cout << "☺ \n"
+              << "x: " << q[0] << "  |  y: " << q[1] << "  |  z: " << q[2] << "\n"
+              << "d_e: " << u[0] << "  |  d_a:" << u[1] << "  |  d_r:" << u[2] << "  |  d_t:" << u[3] << "\n";
 
     // Turn relevant states into vectors
     Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
@@ -258,7 +261,7 @@ void planWithSimpleSetup()
 
     ss.print();
 
-    ob::PlannerStatus solved = ss.solve(100.0);
+    ob::PlannerStatus solved = ss.solve(10.0);
 
     std::cout << "NOT HERE **********************\n";
 
