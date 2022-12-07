@@ -111,15 +111,18 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
     // Casat to data type
-    // ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
+    ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
     // ompl::base::SO2StateSpace::StateType &roll = *s[3]->as<ompl::base::SO2StateSpace::StateType>();
 
     //  Normalize orientation between 0 and 2*pi
     ompl::base::SO2StateSpace SO2;
     std::cout << "preNorm\n";
     // std::cout << reinterpret_cast<void *>(roll) << std::endl;
-    // SO21.enforceBounds(result->as<ob::CompoundState>()[3].as<ob::SO2StateSpace::StateType>(0));
-    SO2.enforceBounds(result->as<ob::CompoundState>()[3].as<ob::SO2StateSpace::StateType>(0));
+    // ob::SE3StateSpace r = result->as<ob::CompoundState>()[0];
+    std::cout << "preNorm2\n";
+    SO2.enforceBounds(result->as<ob::CompoundState>()[0].as<ob::SE3StateSpace::StateType>(3));
+    SO2.enforceBounds(result->as<ob::CompoundState>()[0].as<ob::SE3StateSpace::StateType>(5));
+    SO2.enforceBounds(result->as<ob::CompoundState>()[0].as<ob::SE3StateSpace::StateType>(4));
     // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 
     std::cout << "postNorm\n";
@@ -173,7 +176,8 @@ void planWithSimpleSetup()
     r6->setBounds(velbounds);
 
     // Combine smaller spaces into big main space
-    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
+    // ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
+    ob::StateSpacePtr space = r3 + r6;
 
     // create a control space
     auto cspace(std::make_shared<DemoControlSpace>(space));
