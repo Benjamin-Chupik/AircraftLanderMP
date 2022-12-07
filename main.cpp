@@ -3,8 +3,9 @@ By: Benjamin chupik
 For algorithmic motion planning
 Main function for final project
 
-State Vector: [x, y, z, x_dot, y_dot, z_do, yaw, pitch, roll, yaw_dot, pitch_dot, roll_dot]
-Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
+From tempest file:
+State Vector: [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
+Input Vector: [d_e, d_a, d_r, d_t] (elevator, aileron, ruder, thrust)
 
 */
 
@@ -12,7 +13,10 @@ Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
 // Program Setup
 //--------------------------------------------------------------------
 #include <ompl/control/SpaceInformation.h>
+//#include <ompl/extensions/ode/OpenDEStateSpace.h>
+#include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
+#include <ompl/base/spaces/SO2StateSpace.h>
 #include <ompl/control/ODESolver.h>
 #include <ompl/control/spaces/RealVectorControlSpace.h>
 #include <ompl/control/SimpleSetup.h>
@@ -21,10 +25,6 @@ Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
 #include <fstream>
 #include <valarray>
 #include <limits>
-#include <ompl/geometric/planners/rrt/RRTConnect.h>
-#include <ompl/geometric/PathGeometric.h>
-#include <ompl/base/Path.h>
-#include <ompl/base/StateSpace.h>
 
 #include <tempest.h>
 #include <barometric_formula.h>
@@ -32,31 +32,9 @@ Input Vector: [d_r, d_e, d_a] (ruder, elevator, aileron)
 // Name Spaces
 namespace ob = ompl::base;
 namespace oc = ompl::control;
-namespace og = ompl::geometric;
 
-//--------------------------------------------------------------------
-// Support Functions
-//--------------------------------------------------------------------
-bool isStateValid(const ob::State *state)
-{
-    // cast the abstract state type to the type we expect
-    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
-
-    // extract the first component of the state and cast it to what we expect
-    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
-    // extract the second component of the state and cast it to what we expect
-    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-
-    std::cout << pos->values[0] << "\n";
-
-    return true;
-}
-
-//--------------------------------------------------------------------
-// Dynamics
-//--------------------------------------------------------------------
-
+// Definition of the ODE for the kinematic car.
+// This method is analogous to the above KinematicCarModel::ode function.
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // TODO: hard coded the wind thing
@@ -129,98 +107,133 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     qdot[11] = omega_body_dot[2];
 }
 
-//--------------------------------------------------------------------
-// Planner
-//--------------------------------------------------------------------
-bool plan()
+// This is a callback method invoked after numerical integration.
+void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
-    // construct the state space we are planning in
-    auto space(std::make_shared<ob::SE3StateSpace>());
+    // Casat to data type
+    // ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
+    // ompl::base::SO2StateSpace::StateType &roll = *s[3]->as<ompl::base::SO2StateSpace::StateType>();
 
-    // Set bounds for state space
-    ob::RealVectorBounds bounds(3);
-    bounds.setLow(-100); // TODO: make bounds realistic
-    bounds.setHigh(100);
+    //  Normalize orientation between 0 and 2*pi
+    ompl::base::SO2StateSpace SO2;
+    std::cout << "preNorm\n";
+    // std::cout << reinterpret_cast<void *>(roll) << std::endl;
+    // SO21.enforceBounds(result->as<ob::CompoundState>()[3].as<ob::SO2StateSpace::StateType>(0));
+    SO2.enforceBounds(result->as<ob::CompoundState>()[3].as<ob::SO2StateSpace::StateType>(0));
+    // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 
-    space->setBounds(bounds);
+    std::cout << "postNorm\n";
+}
 
-    // Make object that holds all the state space info
-    auto si(std::make_shared<ob::SpaceInformation>(space));
+bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
+{
+    //    ob::ScopedState<ob::SE2StateSpace>
+    /*
+    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
 
-    // Add the validity checker
-    si->setStateValidityChecker(isStateValid);
+    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
 
-    // Add the start and goal location
+    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+    // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
+    return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
+    */
+    return true;
+}
+
+class DemoControlSpace : public oc::RealVectorControlSpace
+{
+public:
+    DemoControlSpace(const ob::StateSpacePtr &stateSpace) : oc::RealVectorControlSpace(stateSpace, 4)
+    {
+    }
+};
+
+void planWithSimpleSetup()
+{
+    // auto space(std::make_shared<ob::SE3StateSpace>());
+    //  Make state space (R3, SO2x3, R6)
+    // ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3));
+    auto r3(std::make_shared<ob::SE3StateSpace>());
+    // ob::StateSpacePtr so2(new ob::SO2StateSpace());
+    auto so21(std::make_shared<ob::SO2StateSpace>());
+    auto so22(std::make_shared<ob::SO2StateSpace>());
+    auto so23(std::make_shared<ob::SO2StateSpace>());
+    // ob::StateSpacePtr r6(new ob::RealVectorStateSpace(6));
+    auto r6(std::make_shared<ob::RealVectorStateSpace>(6));
+
+    // Make Bounds
+    ob::RealVectorBounds posbounds(3);
+    posbounds.setLow(-1);
+    posbounds.setHigh(1);
+    r3->setBounds(posbounds);
+    ob::RealVectorBounds velbounds(6);
+    velbounds.setLow(-1);
+    velbounds.setHigh(1);
+    r6->setBounds(velbounds);
+
+    // Combine smaller spaces into big main space
+    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
+
+    // create a control space
+    auto cspace(std::make_shared<DemoControlSpace>(space));
+
+    // set the bounds for the control space
+    ob::RealVectorBounds cbounds(4); // 4 dim control space
+    cbounds.setLow(-0.3);
+    cbounds.setHigh(0.3);
+
+    cspace->setBounds(cbounds);
+
+    // define a simple setup class
+    oc::SimpleSetup ss(cspace);
+
+    // set state validity checking for this space
+    oc::SpaceInformation *si = ss.getSpaceInformation().get();
+    ss.setStateValidityChecker([si](const ob::State *state)
+                               { return isStateValid(si, state); });
+
+    // Use the ODESolver to propagate the system.  Call KinematicCarPostIntegration
+    // when integration has finished to normalize the orientation values.
+    auto odeSolver(std::make_shared<oc::ODEBasicSolver<>>(ss.getSpaceInformation(), &TempestODE));
+    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &KinematicCarPostIntegration));
+
     ob::ScopedState<> start(space);
-    start.random(); // To fill out all the states randomly (in case they arnt manualy set)
-    start[0] = -50; // Set x position
-    start[1] = -50; // Set y position
-    start[2] = -50; // Set z position
-
+    start.random();
     ob::ScopedState<> goal(space);
-    goal.random(); // To fill out all the states randomly (in case they arnt manualy set)
-    goal[0] = 0;   // Set x position
-    goal[1] = 0;   // Set y position
-    goal[2] = 0;   // Set z position
+    goal.random();
+    std::cout << "q";
+    ss.setStartAndGoalStates(start, goal, 0.05);
 
-    // Loading variables into the problem definition
-    // Create prob def variable
-    auto pdef(std::make_shared<ob::ProblemDefinition>(si));
-    // Load vars into prob def
-    pdef->setStartAndGoalStates(start, goal);
+    ss.setup();
 
-    // Create planner (RRT)
-    auto planner(std::make_shared<og::RRTConnect>(si));
+    std::cout << "HERE\n";
 
-    // Add the problem to the planner
-    planner->setProblemDefinition(pdef);
+    ob::PlannerStatus solved = ss.solve(100.0);
 
-    // Finalize planner setup
-    planner->setup();
+    std::cout << "NOT HERE **********************\n";
 
-    // Solve Problem
-    float maxSolveTime = 1.0; // Maximum time to spend on solving
-    ob::PlannerStatus solved = planner->ob::Planner::solve(maxSolveTime);
-
-    // If solution is solved:
     if (solved)
     {
-        // get the goal representation from the problem definition (not the same as the goal state)
-        // and inquire about the found path
-        ob::PathPtr path = pdef->getSolutionPath();
         std::cout << "Found solution:" << std::endl;
-
-        // print the path to screen
-        // path->print(std::cout);
 
         // Open file
         std::ofstream myfile;
         myfile.open("OutputPath.data");
 
-        // Print path to file
-        og::PathGeometric path1(dynamic_cast<const og::PathGeometric &>(*pdef->getSolutionPath()));
-        // path1.printAsMatrix(std::cout); //output to terminal
-        path1.printAsMatrix(myfile);
+        ss.getSolutionPath().asGeometric().printAsMatrix(myfile);
 
-        // Close file
-
-        return true; // Return sucsess
+        myfile.close();
     }
     else
-    {
-        std::cout << "No Path Found" << std::endl;
-        return false; // return a failure sence it didnt solve
-    }
+        std::cout << "No solution found" << std::endl;
 }
 
-//--------------------------------------------------------------------
-// Main Run Function
-//--------------------------------------------------------------------
 int main(int /*argc*/, char ** /*argv*/)
 {
-    std::cout << "Starting run\n";
+    std::cout << "OMPL version: " << OMPL_VERSION << std::endl;
 
-    plan();
+    planWithSimpleSetup();
 
     return 0;
 }
