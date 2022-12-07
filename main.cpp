@@ -13,6 +13,8 @@ Input Vector: [d_e, d_a, d_r, d_t] (elevator, aileron, ruder, thrust)
 // Program Setup
 //--------------------------------------------------------------------
 #include <ompl/control/SpaceInformation.h>
+//#include <ompl/extensions/ode/OpenDEStateSpace.h>
+#include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
 #include <ompl/control/ODESolver.h>
@@ -46,9 +48,7 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     // cast control to the type we expect
     const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
     // notes: reference u[0] to u[3], elevator, aileron, rudder, throttle
-    std::cout << "here1.5\n";
-    std::cout << q[6];
-    std::cout << "here2\n";
+
     // Turn relevant states into vectors
     Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
     Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
@@ -110,9 +110,19 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 // This is a callback method invoked after numerical integration.
 void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
-    // Normalize orientation between 0 and 2*pi
-    // ob::SO2StateSpace SO2;
-    // SO2.enforceBounds(result->as<ob::SE3StateSpace::StateType>()->as<ob::SO2StateSpace::StateType>(1)); // TODO: do i need one of these for each quaternian?
+    // Casat to data type
+    // ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
+    // ompl::base::SO2StateSpace::StateType &roll = *s[3]->as<ompl::base::SO2StateSpace::StateType>();
+
+    //  Normalize orientation between 0 and 2*pi
+    ompl::base::SO2StateSpace SO2;
+    std::cout << "preNorm\n";
+    // std::cout << reinterpret_cast<void *>(roll) << std::endl;
+    // SO21.enforceBounds(result->as<ob::CompoundState>()[3].as<ob::SO2StateSpace::StateType>(0));
+    SO2.enforceBounds(result->as<ob::CompoundState>()[3].as<ob::SO2StateSpace::StateType>(0));
+    // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
+
+    std::cout << "postNorm\n";
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
@@ -141,14 +151,29 @@ public:
 
 void planWithSimpleSetup()
 {
-    auto space(std::make_shared<ob::SE3StateSpace>());
+    // auto space(std::make_shared<ob::SE3StateSpace>());
+    //  Make state space (R3, SO2x3, R6)
+    // ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3));
+    auto r3(std::make_shared<ob::SE3StateSpace>());
+    // ob::StateSpacePtr so2(new ob::SO2StateSpace());
+    auto so21(std::make_shared<ob::SO2StateSpace>());
+    auto so22(std::make_shared<ob::SO2StateSpace>());
+    auto so23(std::make_shared<ob::SO2StateSpace>());
+    // ob::StateSpacePtr r6(new ob::RealVectorStateSpace(6));
+    auto r6(std::make_shared<ob::RealVectorStateSpace>(6));
 
     // Make Bounds
-    ob::RealVectorBounds bounds(3);
-    bounds.setLow(-1);
-    bounds.setHigh(1);
+    ob::RealVectorBounds posbounds(3);
+    posbounds.setLow(-1);
+    posbounds.setHigh(1);
+    r3->setBounds(posbounds);
+    ob::RealVectorBounds velbounds(6);
+    velbounds.setLow(-1);
+    velbounds.setHigh(1);
+    r6->setBounds(velbounds);
 
-    space->setBounds(bounds);
+    // Combine smaller spaces into big main space
+    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
 
     // create a control space
     auto cspace(std::make_shared<DemoControlSpace>(space));
@@ -173,11 +198,11 @@ void planWithSimpleSetup()
     auto odeSolver(std::make_shared<oc::ODEBasicSolver<>>(ss.getSpaceInformation(), &TempestODE));
     ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &KinematicCarPostIntegration));
 
-    ob::ScopedState<ob::SE3StateSpace> start(space);
+    ob::ScopedState<> start(space);
     start.random();
-    ob::ScopedState<ob::SE3StateSpace> goal(space);
+    ob::ScopedState<> goal(space);
     goal.random();
-
+    std::cout << "q";
     ss.setStartAndGoalStates(start, goal, 0.05);
 
     ss.setup();
