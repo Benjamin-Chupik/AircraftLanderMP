@@ -50,9 +50,12 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
     // notes: reference u[0] to u[3], elevator, aileron, rudder, throttle
 
+    /*
     std::cout << "☺ \n"
               << "x: " << q[0] << "  |  y: " << q[1] << "  |  z: " << q[2] << "\n"
+              << "roll: " << q[3] << "  |  pitch: " << q[4] << "  |  yaw: " << q[5] << "\n"
               << "d_e: " << u[0] << "  |  d_a:" << u[1] << "  |  d_r:" << u[2] << "  |  d_t:" << u[3] << "\n";
+    */
 
     // Turn relevant states into vectors
     Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
@@ -121,13 +124,12 @@ void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control 
 
     //  Normalize orientation between 0 and 2*pi
     ompl::base::SO2StateSpace SO2;
-    std::cout << "preNorm\n";
     // std::cout << reinterpret_cast<void *>(roll) << std::endl;
     // ob::SE3StateSpace r = result->as<ob::CompoundState>()[0];
-    std::cout << "preNorm2\n";
+    std::cout << "preNorm\n";
+    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1));
+    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
-    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(4));
-    SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(5));
     // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 
     std::cout << "postNorm\n";
@@ -173,13 +175,17 @@ void planWithSimpleSetup()
 
     // Make Bounds
     ob::RealVectorBounds posbounds(3);
-    posbounds.setLow(-1000);
-    posbounds.setHigh(10000);
+    posbounds.setLow(0, -200);
+    posbounds.setHigh(0, 200);
+    posbounds.setLow(1, -200);
+    posbounds.setHigh(1, 200);
+    posbounds.setLow(2, 1800);
+    posbounds.setHigh(2, 2200);
     r3->setBounds(posbounds);
 
     ob::RealVectorBounds velbounds(6);
-    velbounds.setLow(-1000);
-    velbounds.setHigh(10000);
+    velbounds.setLow(-50);
+    velbounds.setHigh(100);
     r6->setBounds(velbounds);
 
     // Combine smaller spaces into big main space
@@ -209,6 +215,10 @@ void planWithSimpleSetup()
 
     // set state validity checking for this space
     oc::SpaceInformation *si = ss.getSpaceInformation().get();
+
+    si->setMinControlDuration(1);
+    si->setMaxControlDuration(2);
+
     ss.setStateValidityChecker([si](const ob::State *state)
                                { return isStateValid(si, state); });
 
@@ -237,7 +247,7 @@ void planWithSimpleSetup()
 
     ob::ScopedState<> goal(space);
     goal.random();
-    goal[0] = 0;
+    goal[0] = 100;
     goal[1] = 0;
     goal[2] = 2000;
 
@@ -253,7 +263,7 @@ void planWithSimpleSetup()
     goal[10] = 0;
     goal[11] = 0;
     std::cout << "q";
-    ss.setStartAndGoalStates(start, goal, 150);
+    ss.setStartAndGoalStates(start, goal, 15);
 
     ss.setup();
 
