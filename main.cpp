@@ -56,7 +56,6 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
               << "roll: " << q[3] << "  |  pitch: " << q[4] << "  |  yaw: " << q[5] << "\n"
               << "d_e: " << u[0] << "  |  d_a:" << u[1] << "  |  d_r:" << u[2] << "  |  d_t:" << u[3] << "\n";
     */
-
     // Turn relevant states into vectors
     Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
     Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
@@ -205,8 +204,8 @@ void planWithSimpleSetup()
     cbounds.setLow(2, -.4);
     cbounds.setHigh(2, .4);
 
-    cbounds.setLow(3, -50);
-    cbounds.setHigh(3, 100);
+    cbounds.setLow(3, -.2);
+    cbounds.setHigh(3, .8);
 
     cspace->setBounds(cbounds);
 
@@ -217,7 +216,8 @@ void planWithSimpleSetup()
     oc::SpaceInformation *si = ss.getSpaceInformation().get();
 
     si->setMinControlDuration(1);
-    si->setMaxControlDuration(2);
+    si->setMaxControlDuration(10);
+    si->setPropagationStepSize(0.1);
 
     ss.setStateValidityChecker([si](const ob::State *state)
                                { return isStateValid(si, state); });
@@ -271,7 +271,7 @@ void planWithSimpleSetup()
 
     ss.print();
 
-    ob::PlannerStatus solved = ss.solve(10.0);
+    ob::PlannerStatus solved = ss.solve(100.0);
 
     std::cout << "NOT HERE **********************\n";
 
