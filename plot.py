@@ -50,6 +50,8 @@ def main():
 
     ax.plot(x, y, z)
     sc = ax.scatter(x, y, z, cmap='hot', c=geo_velocity)
+    ax.scatter(x[0], y[0], z[0], c='blue')
+    ax.scatter(x[-1], y[-1], z[-1], c='green')
     ax.set_xlabel("x Position")
     ax.set_ylabel("y Position")
     ax.set_zlabel("z Position")
