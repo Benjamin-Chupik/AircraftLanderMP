@@ -200,8 +200,8 @@ void planWithSimpleSetup()
     cbounds.setLow(2, -.4);
     cbounds.setHigh(2, .4);
 
-    cbounds.setLow(3, -.2);
-    cbounds.setHigh(3, .8);
+    cbounds.setLow(3, -.3);
+    cbounds.setHigh(3, .7);
 
     cspace->setBounds(cbounds);
 
@@ -233,7 +233,7 @@ void planWithSimpleSetup()
     start[4] = 0;
     start[5] = 0;
 
-    start[6] = 40;
+    start[6] = 17;
     start[7] = 0;
     start[8] = 0;
 
@@ -245,13 +245,13 @@ void planWithSimpleSetup()
     goal.random();
     goal[0] = 100;
     goal[1] = 0;
-    goal[2] = -2000;
+    goal[2] = -1990;
 
     goal[3] = 0;
     goal[4] = 0;
     goal[5] = 0;
 
-    goal[6] = 40;
+    goal[6] = 23;
     goal[7] = 0;
     goal[8] = 0;
 
@@ -259,7 +259,7 @@ void planWithSimpleSetup()
     goal[10] = 0;
     goal[11] = 0;
 
-    ss.setStartAndGoalStates(start, goal, .001);
+    ss.setStartAndGoalStates(start, goal, 15);
 
     // Change Planner
     ompl::base::PlannerPtr planner(new oc::SST(ss.getSpaceInformation()));
@@ -270,13 +270,22 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(200.0);
+    ob::PlannerStatus solved = ss.solve(10.0);
 
     // std::cout << "NOT HERE **********************\n";
 
     if (solved)
     {
         std::cout << "Found solution:" << std::endl;
+
+        if (ss.haveExactSolutionPath ())
+        {
+            std::cout << "Solution is exact" << std::endl;
+        }
+        else
+        {
+            std::cout << "Solution is not exact" << std::endl;
+        }
 
         // Open file
         std::ofstream myfile_geo, myfile_cont;
