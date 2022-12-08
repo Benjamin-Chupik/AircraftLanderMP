@@ -7,6 +7,8 @@ From tempest file:
 State Vector: [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
 Input Vector: [d_e, d_a, d_r, d_t] (elevator, aileron, ruder, thrust)
 
+Axis Frame: NED (so z needs to be negative)
+
 */
 
 //--------------------------------------------------------------------
@@ -171,8 +173,8 @@ void planWithSimpleSetup()
     posbounds.setHigh(0, 200);
     posbounds.setLow(1, -200);
     posbounds.setHigh(1, 200);
-    posbounds.setLow(2, 1800);
-    posbounds.setHigh(2, 2200);
+    posbounds.setLow(2, -1800);
+    posbounds.setHigh(2, -2200);
     r3->setBounds(posbounds);
 
     ob::RealVectorBounds velbounds(6);
@@ -224,7 +226,7 @@ void planWithSimpleSetup()
     start.random();
     start[0] = 0;
     start[1] = 0;
-    start[2] = 2000;
+    start[2] = -2000;
 
     start[3] = 0;
     start[4] = 0;
@@ -242,7 +244,7 @@ void planWithSimpleSetup()
     goal.random();
     goal[0] = 100;
     goal[1] = 0;
-    goal[2] = 2000;
+    goal[2] = -2000;
 
     goal[3] = 0;
     goal[4] = 0;

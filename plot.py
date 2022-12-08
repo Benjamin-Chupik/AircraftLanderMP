@@ -26,7 +26,7 @@ def main():
         "./build/Debug/OutputPath_cont.data", delimiter=" ")
     x = geoPath[:, 0]
     y = geoPath[:, 1]
-    z = geoPath[:, 2]
+    z = -geoPath[:, 2]  # NED
 
     roll = geoPath[:, 3]
     pitch = geoPath[:, 4]
