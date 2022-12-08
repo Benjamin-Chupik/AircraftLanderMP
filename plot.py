@@ -5,7 +5,11 @@ Plots the generated path from the main.cpp run
 
 
 Data file structure:
+    Gemetric File
     [x_pos, y_pos, z_pos, roll, pitch, yaw, x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot]
+
+    Control File
+    [x_pos, y_pos, z_pos, roll, pitch, yaw, x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot, d_e, d_a, d_r, thrust, conrol duration]
 
 """
 
@@ -17,39 +21,40 @@ from numpy import sqrt
 
 def main():
     # import path
-    path = np.genfromtxt("./build/Debug/OutputPath.data", delimiter=" ")
-    x = path[:, 0]
-    y = path[:, 1]
-    z = path[:, 2]
+    geoPath = np.genfromtxt("./build/Debug/OutputPath_geo.data", delimiter=" ")
+    contPath = np.genfromtxt(
+        "./build/Debug/OutputPath_cont.data", delimiter=" ")
+    x = geoPath[:, 0]
+    y = geoPath[:, 1]
+    z = geoPath[:, 2]
 
-    roll = path[:, 3]
-    pitch = path[:, 4]
-    yaw = path[:, 5]
+    roll = geoPath[:, 3]
+    pitch = geoPath[:, 4]
+    yaw = geoPath[:, 5]
 
-    x_dot = path[:, 6]
-    y_dot = path[:, 7]
-    z_dot = path[:, 8]
+    x_dot = geoPath[:, 6]
+    y_dot = geoPath[:, 7]
+    z_dot = geoPath[:, 8]
 
-    roll_dot = path[:, 9]
-    pitch_dot = path[:, 10]
-    yaw_dot = path[:, 11]
+    roll_dot = geoPath[:, 9]
+    pitch_dot = geoPath[:, 10]
+    yaw_dot = geoPath[:, 11]
+
+    # get color map for velocity
+    geo_velocity = sqrt(x_dot**2+y_dot**2+z_dot**2)
 
     # Plotting
     fig = plt.figure()
     ax = plt.axes(projection="3d")
     fig.tight_layout()
 
-    # get color map for velocity
-    col = sqrt(x_dot**2+y_dot**2+z_dot**2)
-
-    ax.plot3D(x, y, z, c=col)
+    ax.plot(x, y, z)
+    sc = ax.scatter(x, y, z, cmap='hot', c=geo_velocity)
     ax.set_xlabel("x Position")
     ax.set_ylabel("y Position")
     ax.set_zlabel("z Position")
 
-    print(path)
-
-    # PLotting
+    fig.colorbar(sc, label='Velocity')
 
 
 # -----------------------------------------------------------------------------------------------------
