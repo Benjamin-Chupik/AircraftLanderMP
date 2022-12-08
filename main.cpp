@@ -5,7 +5,7 @@ Main function for final project
 
 From tempest file:
 State Vector: [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
-Input Vector: [d_e, d_a, d_r, d_t] (elevator, aileron, ruder, thrust)
+Input Vector: [d_e, d_a, d_r, t] (elevator, aileron, ruder, thrust)
 
 Axis Frame: NED (so z needs to be negative)
 
@@ -27,6 +27,7 @@ Axis Frame: NED (so z needs to be negative)
 #include <fstream>
 #include <valarray>
 #include <limits>
+#include <ompl/control/planners/sst/SST.h>
 
 #include <tempest.h>
 #include <barometric_formula.h>
@@ -258,13 +259,18 @@ void planWithSimpleSetup()
     goal[10] = 0;
     goal[11] = 0;
 
-    ss.setStartAndGoalStates(start, goal, 15);
+    ss.setStartAndGoalStates(start, goal, .001);
 
+    // Change Planner
+    ompl::base::PlannerPtr planner(new oc::SST(ss.getSpaceInformation()));
+    ss.setPlanner(planner);
+
+    // Finalize setup
     ss.setup();
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(100.0);
+    ob::PlannerStatus solved = ss.solve(200.0);
 
     // std::cout << "NOT HERE **********************\n";
 
