@@ -173,8 +173,8 @@ void planWithSimpleSetup()
     posbounds.setHigh(0, 200);
     posbounds.setLow(1, -200);
     posbounds.setHigh(1, 200);
-    posbounds.setLow(2, -1800);
-    posbounds.setHigh(2, -2200);
+    posbounds.setLow(2, -2200);
+    posbounds.setHigh(2, -1800);
     r3->setBounds(posbounds);
 
     ob::RealVectorBounds velbounds(6);
@@ -262,7 +262,7 @@ void planWithSimpleSetup()
 
     ss.setup();
 
-    ss.print();
+    // ss.print();
 
     ob::PlannerStatus solved = ss.solve(100.0);
 
