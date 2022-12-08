@@ -117,21 +117,14 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 // This is a callback method invoked after numerical integration.
 void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
-    // Casat to data type
-    // ompl::base::CompoundState &s = *result->as<ompl::base::CompoundState>();
-    // ompl::base::SO2StateSpace::StateType &roll = *s[3]->as<ompl::base::SO2StateSpace::StateType>();
 
     //  Normalize orientation between 0 and 2*pi
     ompl::base::SO2StateSpace SO2;
-    // std::cout << reinterpret_cast<void *>(roll) << std::endl;
-    // ob::SE3StateSpace r = result->as<ob::CompoundState>()[0];
-    // std::cout << "preNorm\n";
+
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
     // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
-
-    // std::cout << "postNorm\n";
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
@@ -262,12 +255,10 @@ void planWithSimpleSetup()
     goal[9] = 0;
     goal[10] = 0;
     goal[11] = 0;
-    // std::cout << "q";
+
     ss.setStartAndGoalStates(start, goal, 15);
 
     ss.setup();
-
-    // std::cout << "HERE\n";
 
     ss.print();
 
@@ -280,12 +271,15 @@ void planWithSimpleSetup()
         std::cout << "Found solution:" << std::endl;
 
         // Open file
-        std::ofstream myfile;
-        myfile.open("OutputPath.data");
+        std::ofstream myfile_geo, myfile_cont;
+        myfile_geo.open("OutputPath_geo.data");   // geometric data
+        myfile_cont.open("OutputPath_cont.data"); // control data
 
-        ss.getSolutionPath().asGeometric().printAsMatrix(myfile);
+        ss.getSolutionPath().asGeometric().printAsMatrix(myfile_geo);
+        ss.getSolutionPath().printAsMatrix(myfile_cont);
 
-        myfile.close();
+        myfile_geo.close();
+        myfile_cont.close();
     }
     else
         std::cout << "No solution found" << std::endl;
