@@ -19,6 +19,10 @@ Axis Frame: NED (so z needs to be negative)
 #include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
+
+#include <ompl/base/goals/GoalRegion.h>
+#include <ompl/base/SpaceInformation.h>
+
 #include <ompl/control/ODESolver.h>
 #include <ompl/control/spaces/RealVectorControlSpace.h>
 #include <ompl/control/SimpleSetup.h>
@@ -131,11 +135,13 @@ void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control 
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
-{
+{   
+    double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+    double z = pos[2];
     //    ob::ScopedState<ob::SE2StateSpace>
     /*
     const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
-
+    
     const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
 
     const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
@@ -143,7 +149,13 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
     return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
     */
-    return true;
+    if(z>0){
+        return false;
+    }
+    else{
+        return true;
+    }
+    
 }
 
 class DemoControlSpace : public oc::RealVectorControlSpace
@@ -174,8 +186,8 @@ void planWithSimpleSetup()
     posbounds.setHigh(0, 200);
     posbounds.setLow(1, -200);
     posbounds.setHigh(1, 200);
-    posbounds.setLow(2, -2200);
-    posbounds.setHigh(2, -1800);
+    posbounds.setLow(2, -200);
+    posbounds.setHigh(2, 0);
     r3->setBounds(posbounds);
 
     ob::RealVectorBounds velbounds(6);
@@ -200,7 +212,7 @@ void planWithSimpleSetup()
     cbounds.setLow(2, -.4);
     cbounds.setHigh(2, .4);
 
-    cbounds.setLow(3, -.3);
+    cbounds.setLow(3, -.7);
     cbounds.setHigh(3, .7);
 
     cspace->setBounds(cbounds);
@@ -227,7 +239,7 @@ void planWithSimpleSetup()
     start.random();
     start[0] = 0;
     start[1] = 0;
-    start[2] = -2000;
+    start[2] = -25;
 
     start[3] = 0;
     start[4] = 0;
@@ -241,6 +253,30 @@ void planWithSimpleSetup()
     start[10] = 0;
     start[11] = 0;
 
+    class CustomGoal: public ob::GoalRegion
+    {
+    public:
+        CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
+        {
+            threshold_ = 0.5;
+        }
+    
+        double distanceGoal(const ob::State *st) const override
+        {
+
+            double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+            double dz = fabs(pos[2]+0.2);
+
+            double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+            double zdot = fabs(vel[2]+0.1);
+
+            //std::cout << pos[0] <<"\n";
+            return fabs(dz*dz+zdot*zdot);
+        }
+    };
+    ss.setStartState(start);
+    ss.setGoal(std::make_shared<CustomGoal>(ss.getSpaceInformation()));
+    /*
     ob::ScopedState<> goal(space);
     goal.random();
     goal[0] = 100;
@@ -260,7 +296,7 @@ void planWithSimpleSetup()
     goal[11] = 0;
 
     ss.setStartAndGoalStates(start, goal, 15);
-
+    */
     // Change Planner
     ompl::base::PlannerPtr planner(new oc::SST(ss.getSpaceInformation()));
     ss.setPlanner(planner);
