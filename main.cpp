@@ -278,7 +278,7 @@ void planWithSimpleSetup()
 
     ob::ScopedState<> start(space);
     start.random();
-    start[0] = 0;
+    start[0] = -199;
     start[1] = 0;
     start[2] = -20;
 
@@ -309,10 +309,12 @@ void planWithSimpleSetup()
             double dz = fabs(pos[2] + 0.2);
 
             double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            double zdot = fabs(vel[2] + 0.1);
+            double xdot = fabs(vel[0]);
+            double ydot = fabs(vel[1]);
+            double zdot = fabs(vel[2]);
 
             // std::cout << pos[0] <<"\n";
-            return fabs(dz * dz + zdot * zdot);
+            return sqrt(dz * dz + zdot * zdot + ydot * ydot + xdot * xdot);
         }
     };
     ss.setStartState(start);
