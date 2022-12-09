@@ -140,7 +140,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[3] = euler_rates[0];
     qdot[4] = euler_rates[1];
     qdot[5] = euler_rates[2];
-    qdot[6] = -1.0;
+    qdot[6] = -100.0;
     qdot[7] = 0.0;
     qdot[8] = 0.0;
     qdot[9] = 0.0;
@@ -154,7 +154,6 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     if (q[2] > -1)
     {
         groundDynamics(q, control, qdot);
-        std::cout << ":)";
     }
     else
     {
@@ -176,13 +175,13 @@ void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control 
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
-{   
+{
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
     double z = pos[2];
     //    ob::ScopedState<ob::SE2StateSpace>
     /*
     const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
-    
+
     const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
 
     const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
@@ -190,13 +189,14 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
     return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
     */
-    if(z>0){
+    if (z > 0)
+    {
         return false;
     }
-    else{
+    else
+    {
         return true;
     }
-    
 }
 
 class DemoControlSpace : public oc::RealVectorControlSpace
@@ -294,25 +294,25 @@ void planWithSimpleSetup()
     start[10] = 0;
     start[11] = 0;
 
-    class CustomGoal: public ob::GoalRegion
+    class CustomGoal : public ob::GoalRegion
     {
     public:
         CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
         {
             threshold_ = 0.5;
         }
-    
+
         double distanceGoal(const ob::State *st) const override
         {
 
             double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
-            double dz = fabs(pos[2]+0.2);
+            double dz = fabs(pos[2] + 0.2);
 
             double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            double zdot = fabs(vel[2]+0.1);
+            double zdot = fabs(vel[2] + 0.1);
 
-            //std::cout << pos[0] <<"\n";
-            return fabs(dz*dz+zdot*zdot);
+            // std::cout << pos[0] <<"\n";
+            return fabs(dz * dz + zdot * zdot);
         }
     };
     ss.setStartState(start);
@@ -347,7 +347,7 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(4 * 60.0);
+    ob::PlannerStatus solved = ss.solve(.5 * 60.0);
 
     // std::cout << "NOT HERE **********************\n";
 
