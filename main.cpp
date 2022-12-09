@@ -36,11 +36,10 @@ Axis Frame: NED (so z needs to be negative)
 namespace ob = ompl::base;
 namespace oc = ompl::control;
 
-// Definition of the ODE for the kinematic car.
-// This method is analogous to the above KinematicCarModel::ode function.
-void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+// Definition of the ODE
+// Gound
+void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
-
     // TODO: hard coded the wind thing
     Eigen::Vector3d wind_inertial{0, 0, 0};
 
@@ -117,6 +116,48 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     qdot[11] = omega_body_dot[2];
 }
 
+void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+{
+
+    // Turn relevant states into vectors
+    Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
+    Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
+    Eigen::Vector3d vel_body{q[6], q[7], q[8]};
+    Eigen::Vector3d omega_body{q[9], q[10], q[11]};
+
+    // Kinematics
+    Eigen::Vector3d vel_inertial = TransformFromBodyToInertial(vel_body, euler_angles);
+    Eigen::Vector3d euler_rates = EulerRatesFromOmegaBody(omega_body, euler_angles);
+
+    // State Derivative
+    qdot[0] = vel_inertial[0];
+    qdot[1] = vel_inertial[1];
+    qdot[2] = vel_inertial[2];
+    qdot[3] = euler_rates[0];
+    qdot[4] = euler_rates[1];
+    qdot[5] = euler_rates[2];
+    qdot[6] = -1.0;
+    qdot[7] = 0.0;
+    qdot[8] = 0.0;
+    qdot[9] = 0.0;
+    qdot[10] = 0.0;
+    qdot[11] = 0.0;
+}
+
+void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+{
+    // If the z component is less than 0.5 meters its on the ground
+    if (q[2] > -1)
+    {
+        groundDynamics(q, control, qdot);
+        std::cout << ":)";
+    }
+    else
+    {
+        flightDynamics(q, control, qdot);
+    }
+}
+
 // This is a callback method invoked after numerical integration.
 void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
@@ -174,8 +215,8 @@ void planWithSimpleSetup()
     posbounds.setHigh(0, 200);
     posbounds.setLow(1, -200);
     posbounds.setHigh(1, 200);
-    posbounds.setLow(2, -2200);
-    posbounds.setHigh(2, -1800);
+    posbounds.setLow(2, -200);
+    posbounds.setHigh(2, 0);
     r3->setBounds(posbounds);
 
     ob::RealVectorBounds velbounds(6);
@@ -227,13 +268,13 @@ void planWithSimpleSetup()
     start.random();
     start[0] = 0;
     start[1] = 0;
-    start[2] = -2000;
+    start[2] = -15;
 
     start[3] = 0;
     start[4] = 0;
     start[5] = 0;
 
-    start[6] = 17;
+    start[6] = 15;
     start[7] = 0;
     start[8] = 0;
 
@@ -243,15 +284,15 @@ void planWithSimpleSetup()
 
     ob::ScopedState<> goal(space);
     goal.random();
-    goal[0] = 100;
+    goal[0] = 0;
     goal[1] = 0;
-    goal[2] = -1990;
+    goal[2] = -0.2;
 
     goal[3] = 0;
     goal[4] = 0;
     goal[5] = 0;
 
-    goal[6] = 23;
+    goal[6] = 0;
     goal[7] = 0;
     goal[8] = 0;
 
@@ -270,7 +311,7 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(10.0);
+    ob::PlannerStatus solved = ss.solve(4 * 60.0);
 
     // std::cout << "NOT HERE **********************\n";
 
@@ -278,7 +319,7 @@ void planWithSimpleSetup()
     {
         std::cout << "Found solution:" << std::endl;
 
-        if (ss.haveExactSolutionPath ())
+        if (ss.haveExactSolutionPath())
         {
             std::cout << "Solution is exact" << std::endl;
         }
