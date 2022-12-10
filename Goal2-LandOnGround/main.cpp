@@ -41,7 +41,6 @@ namespace ob = ompl::base;
 namespace oc = ompl::control;
 
 // Definition of the ODE
-// Gound
 void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // TODO: hard coded the wind thing
@@ -170,33 +169,23 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 }
 
 // This is a callback method invoked after numerical integration.
-void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
+void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
 
     //  Normalize orientation between 0 and 2*pi
-    ompl::base::SO2StateSpace SO2;
+    ompl::base::SO2StateSpace SO2; // make a class so we have acsess to the bounds function
 
+    // Enforce the bounds on all the angle states
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
-    // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
     double z = pos[2];
-    //    ob::ScopedState<ob::SE2StateSpace>
-    /*
-    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
 
-    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
-    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-
-    // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
-    */
     if (z > 0)
     {
         return false;
@@ -215,32 +204,56 @@ public:
     }
 };
 
+class CustomGoal : public ob::GoalRegion
+{
+public:
+    CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
+    {
+        threshold_ = 0.5;
+    }
+
+    double distanceGoal(const ob::State *st) const override
+    {
+
+        double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+        double dz = fabs(pos[2] + 0.2);
+
+        // Get stuff out of vector
+        double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+        double xdot = fabs(vel[0]);
+        double ydot = fabs(vel[1]);
+        double zdot = fabs(vel[2]);
+
+        // Goal weighting
+        double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
+        double zPosNorm = sqrt(dz * dz);
+        return zPosNorm + velocity;
+    }
+};
+
 void planWithSimpleSetup()
 {
     // auto space(std::make_shared<ob::SE3StateSpace>());
     //  Make state space (R3, SO2x3, R6)
-    // ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3));
-    // auto r3(std::make_shared<ob::SE3StateSpace>());
-    auto r3(std::make_shared<ob::RealVectorStateSpace>(3));
-    // ob::StateSpacePtr so2(new ob::SO2StateSpace());
-    auto so21(std::make_shared<ob::SO2StateSpace>());
-    auto so22(std::make_shared<ob::SO2StateSpace>());
-    auto so23(std::make_shared<ob::SO2StateSpace>());
-    // ob::StateSpacePtr r6(new ob::RealVectorStateSpace(6));
-    auto r6(std::make_shared<ob::RealVectorStateSpace>(6));
+    auto r3(std::make_shared<ob::RealVectorStateSpace>(3)); // R^3 (position)
+    auto so21(std::make_shared<ob::SO2StateSpace>());       // so2 (roll)
+    auto so22(std::make_shared<ob::SO2StateSpace>());       // so2 (pitch)
+    auto so23(std::make_shared<ob::SO2StateSpace>());       // so2 (yaw)
+    auto r6(std::make_shared<ob::RealVectorStateSpace>(6)); // R^6 (position velocity, anguar velocity)
 
-    // Make Bounds
-    ob::RealVectorBounds posbounds(3);
-    posbounds.setLow(0, -200);
-    posbounds.setHigh(0, 200);
-    posbounds.setLow(1, -50);
-    posbounds.setHigh(1, 50);
-    posbounds.setLow(2, -50);
-    posbounds.setHigh(2, 0);
-    r3->setBounds(posbounds);
-
-    ob::RealVectorBounds velbounds(6);
-    velbounds.setLow(-50);
+    // Make State Space Bounds (so2 bounds allready fixed)
+    ob::RealVectorBounds posbounds(3); // Position
+    ob::RealVectorBounds velbounds(6); // Velocities
+    // Position bounds
+    posbounds.setLow(0, -200); // x
+    posbounds.setHigh(0, 200); // x
+    posbounds.setLow(1, -50);  // y
+    posbounds.setHigh(1, 50);  // y
+    posbounds.setLow(2, -50);  // z
+    posbounds.setHigh(2, 0);   // z
+    r3->setBounds(posbounds);  // set the bounds
+    // Velocity bounds
+    velbounds.setLow(-50); // TODO: make these bounds more realisitc
     velbounds.setHigh(100);
     r6->setBounds(velbounds);
 
@@ -252,17 +265,14 @@ void planWithSimpleSetup()
 
     // set the bounds for the control space
     ob::RealVectorBounds cbounds(4); // 4 dim control space
-    cbounds.setLow(0, -.4);
-    cbounds.setHigh(0, .4);
-
-    cbounds.setLow(1, -.4);
-    cbounds.setHigh(1, .4);
-
-    cbounds.setLow(2, -.4);
-    cbounds.setHigh(2, .4);
-
-    cbounds.setLow(3, -.7);
-    cbounds.setHigh(3, .7);
+    cbounds.setLow(0, -.4);          // elevator deflection [rads]
+    cbounds.setHigh(0, .4);          // elevator deflection [rads]
+    cbounds.setLow(1, -.4);          // aileron deflection [rads]
+    cbounds.setHigh(1, .4);          // aileron deflection [rads]
+    cbounds.setLow(2, -.4);          // rudder deflection [rads]
+    cbounds.setHigh(2, .4);          // rudder deflection [rads]
+    cbounds.setLow(3, -.7);          // Throttel Ranage (percents not newtons)
+    cbounds.setHigh(3, .7);          // Throttel Ranage
 
     cspace->setBounds(cbounds);
 
@@ -272,96 +282,55 @@ void planWithSimpleSetup()
     // set state validity checking for this space
     oc::SpaceInformation *si = ss.getSpaceInformation().get();
 
-    si->setMinControlDuration(1);
-    si->setMaxControlDuration(10);
-    si->setPropagationStepSize(0.1);
+    // Change integration and control timings
+    si->setMinControlDuration(1);    // Lowest step of control
+    si->setMaxControlDuration(10);   // Highest step osf control
+    si->setPropagationStepSize(0.1); // Step size of time
 
     ss.setStateValidityChecker([si](const ob::State *state)
                                { return isStateValid(si, state); });
 
-    // Use the ODESolver to propagate the system.  Call KinematicCarPostIntegration
+    // Use the ODESolver to propagate the system.  Call PostIntegration
     // when integration has finished to normalize the orientation values.
     auto odeSolver(std::make_shared<oc::ODEBasicSolver<>>(ss.getSpaceInformation(), &TempestODE));
-    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &KinematicCarPostIntegration));
+    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &PostIntegration));
 
+    // Make start vector
     ob::ScopedState<> start(space);
     start.random();
+    // Position
     start[0] = -199;
     start[1] = 0;
     start[2] = -20;
-
+    // Angles
     start[3] = 0;
     start[4] = 0;
     start[5] = 0;
-
+    // Velocity
     start[6] = 15;
     start[7] = 0;
     start[8] = 0;
-
+    // Angular velocity
     start[9] = 0;
     start[10] = 0;
     start[11] = 0;
 
-    class CustomGoal : public ob::GoalRegion
-    {
-    public:
-        CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
-        {
-            threshold_ = 0.5;
-        }
-
-        double distanceGoal(const ob::State *st) const override
-        {
-
-            double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
-            double dz = fabs(pos[2] + 0.2);
-
-            double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            double xdot = fabs(vel[0]);
-            double ydot = fabs(vel[1]);
-            double zdot = fabs(vel[2]);
-
-            double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
-            double zPosNorm = sqrt(dz * dz);
-            return zPosNorm + velocity;
-        }
-    };
+    // Set start and goal positions
     ss.setStartState(start);
     ss.setGoal(std::make_shared<CustomGoal>(ss.getSpaceInformation()));
-    /*
-    ob::ScopedState<> goal(space);
-    goal.random();
-    goal[0] = 0;
-    goal[1] = 0;
-    goal[2] = -0.2;
 
-    goal[3] = 0;
-    goal[4] = 0;
-    goal[5] = 0;
-
-    goal[6] = 0;
-    goal[7] = 0;
-    goal[8] = 0;
-
-    goal[9] = 0;
-    goal[10] = 0;
-    goal[11] = 0;
-
-    ss.setStartAndGoalStates(start, goal, 15);
-    */
-    // Change Planner
+    // Change Planner to SST
     ompl::base::PlannerPtr planner(new oc::SST(ss.getSpaceInformation()));
     ss.setPlanner(planner);
 
     // Finalize setup
     ss.setup();
 
-    // ss.print();
+    // ss.print(); // Print the setup information
 
     ob::PlannerStatus solved = ss.solve(2 * 60.0);
 
-    // std::cout << "NOT HERE **********************\n";
-
+    // Displaying information
     if (solved)
     {
         std::cout << "Found solution:" << std::endl;
@@ -380,9 +349,11 @@ void planWithSimpleSetup()
         myfile_geo.open("OutputPath_geo.data");   // geometric data
         myfile_cont.open("OutputPath_cont.data"); // control data
 
+        // Print solution to files
         ss.getSolutionPath().asGeometric().printAsMatrix(myfile_geo);
         ss.getSolutionPath().printAsMatrix(myfile_cont);
 
+        // Close files
         myfile_geo.close();
         myfile_cont.close();
     }
