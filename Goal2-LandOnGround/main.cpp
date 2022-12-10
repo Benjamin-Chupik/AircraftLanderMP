@@ -214,20 +214,33 @@ public:
 
     double distanceGoal(const ob::State *st) const override
     {
-
+        // Break the state apart into components (position)
         double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
-        double dz = fabs(pos[2] + 0.2);
+        double x = pos[0];
+        double y = pos[1];
+        double z = pos[2];
 
-        // Get stuff out of vector
+        // Break the state apart into components (roll, pitch, yaw)
+        double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
+        double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
+        double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+
+        // Break the state apart into components (velocity)
         double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-        double xdot = fabs(vel[0]);
-        double ydot = fabs(vel[1]);
-        double zdot = fabs(vel[2]);
+        double xdot = vel[0];
+        double ydot = vel[1];
+        double zdot = vel[2];
 
-        // Goal weighting
+        //
+        double dz = fabs(z);
+
+        // Goal vectors
         double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
         double zPosNorm = sqrt(dz * dz);
-        return zPosNorm + velocity;
+        double anglenorm = sqrt(pitch * pitch + roll * roll);
+
+        // Goal weighting of vectors (more weight is more important)
+        return zPosNorm + velocity + 0.1 * anglenorm;
     }
 };
 
