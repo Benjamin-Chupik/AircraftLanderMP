@@ -6,10 +6,10 @@ Plots the generated path from the main.cpp run
 
 Data file structure:
     Gemetric File
-    [x_pos, y_pos, z_pos, roll, pitch, yaw, x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot]
+    [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
 
     Control File
-    [x_pos, y_pos, z_pos, roll, pitch, yaw, x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot, d_e, d_a, d_r, thrust, conrol duration]
+    [x_pos, y_pos, z_pos, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot d_e, d_a, d_r, thrust, conrol duration]
 
 """
 
@@ -57,9 +57,9 @@ def main():
     y = geoPath[:, 1]
     z = -geoPath[:, 2]  # NED
 
-    roll = geoPath[:, 3]
+    yaw = geoPath[:, 3]
     pitch = geoPath[:, 4]
-    yaw = geoPath[:, 5]
+    roll = geoPath[:, 5]
 
     x_dot = geoPath[:, 6]
     y_dot = geoPath[:, 7]
