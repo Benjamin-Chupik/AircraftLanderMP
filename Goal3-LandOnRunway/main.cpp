@@ -120,13 +120,19 @@ void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[11] = omega_body_dot[2];
 }
 
+
 void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
+    /*
+    Void out y and z velocities so y and z body dosent change
+    x velocity is normal, but x acceleration is really negative untill its velocity is zero and then stops
+    */
 
     // Turn relevant states into vectors
     Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
     Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
-    Eigen::Vector3d vel_body{q[6], q[7], q[8]};
+    // Eigen::Vector3d vel_body{q[6], q[7], q[8]};
+    Eigen::Vector3d vel_body{q[6], 0, 0}; // Void
     Eigen::Vector3d omega_body{q[9], q[10], q[11]};
 
     // Kinematics
@@ -136,22 +142,26 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     // State Derivative
     qdot[0] = vel_inertial[0];
     qdot[1] = vel_inertial[1];
-    qdot[2] = vel_inertial[2];
-    qdot[3] = euler_rates[0];
-    qdot[4] = euler_rates[1];
-    qdot[5] = euler_rates[2];
-    qdot[6] = -100.0;
+    qdot[2] = 0;
+
+    qdot[3] = 0;
+    qdot[4] = 0;
+    qdot[5] = 0;
+
+    qdot[6] = -10.0;
     qdot[7] = 0.0;
     qdot[8] = 0.0;
+
     qdot[9] = 0.0;
     qdot[10] = 0.0;
     qdot[11] = 0.0;
 }
 
+
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // If the z component is less than 0.5 meters its on the ground
-    if (q[2] > -0.5)
+    if (q[2] > -0.2)
     {
         groundDynamics(q, control, qdot);
     }
@@ -310,6 +320,10 @@ void planWithSimpleSetup()
             double y = pos[1];
             double z = pos[2];
 
+            double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
+            double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
+            double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+    
             double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
             double xdot = vel[0];
             double ydot = vel[1];
@@ -339,8 +353,12 @@ void planWithSimpleSetup()
             else{
                 dz = fabs(z);
             }
-            // std::cout << pos[0] <<"\n";
-            return sqrt(dx*dx+dy*dy+dz*dz);
+
+            double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
+            double runwaynorm = sqrt(dx*dx+dy*dy+dz*dz);
+            double anglenorm = sqrt(pitch*pitch + roll*roll);
+
+            return runwaynorm + velocity + anglenorm;
         }
     };
     ss.setStartState(start);
