@@ -122,11 +122,16 @@ void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
 
 void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
+    /*
+    Void out y and z velocities so y and z body dosent change
+    x velocity is normal, but x acceleration is really negative untill its velocity is zero and then stops
+    */
 
     // Turn relevant states into vectors
     Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
     Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
-    Eigen::Vector3d vel_body{q[6], q[7], q[8]};
+    // Eigen::Vector3d vel_body{q[6], q[7], q[8]};
+    Eigen::Vector3d vel_body{q[6], 0, 0}; // Void
     Eigen::Vector3d omega_body{q[9], q[10], q[11]};
 
     // Kinematics
@@ -136,13 +141,16 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     // State Derivative
     qdot[0] = vel_inertial[0];
     qdot[1] = vel_inertial[1];
-    qdot[2] = vel_inertial[2];
-    qdot[3] = euler_rates[0];
-    qdot[4] = euler_rates[1];
-    qdot[5] = euler_rates[2];
-    qdot[6] = -100.0;
+    qdot[2] = 0;
+
+    qdot[3] = 0;
+    qdot[4] = 0;
+    qdot[5] = 0;
+
+    qdot[6] = -10.0;
     qdot[7] = 0.0;
     qdot[8] = 0.0;
+
     qdot[9] = 0.0;
     qdot[10] = 0.0;
     qdot[11] = 0.0;
@@ -150,8 +158,8 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
 
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
-    // If the z component is less than 0.5 meters its on the ground
-    if (q[2] > -1)
+    // If the z component is less than 0.5 meters its on the ground, y and z velocity is less than 0.5 m/s
+    if (q[2] > -1) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
     {
         groundDynamics(q, control, qdot);
     }
@@ -314,7 +322,7 @@ void planWithSimpleSetup()
             double zdot = fabs(vel[2]);
 
             // std::cout << pos[0] <<"\n";
-            return sqrt(dz * dz + zdot * zdot + ydot * ydot + xdot * xdot);
+            return sqrt(dz * dz + (zdot * zdot) + ydot * ydot + xdot * xdot);
         }
     };
     ss.setStartState(start);
@@ -349,7 +357,7 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(.5 * 60.0);
+    ob::PlannerStatus solved = ss.solve(10 * 60.0);
 
     // std::cout << "NOT HERE **********************\n";
 
