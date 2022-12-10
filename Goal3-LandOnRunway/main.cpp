@@ -151,7 +151,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // If the z component is less than 0.5 meters its on the ground
-    if (q[2] > -1)
+    if (q[2] > -0.5)
     {
         groundDynamics(q, control, qdot);
     }
@@ -223,11 +223,11 @@ void planWithSimpleSetup()
 
     // Make Bounds
     ob::RealVectorBounds posbounds(3);
-    posbounds.setLow(0, -200);
-    posbounds.setHigh(0, 200);
-    posbounds.setLow(1, -200);
-    posbounds.setHigh(1, 200);
-    posbounds.setLow(2, -200);
+    posbounds.setLow(0, -100);
+    posbounds.setHigh(0, 100);
+    posbounds.setLow(1, -50);
+    posbounds.setHigh(1, 50);
+    posbounds.setLow(2, -50);
     posbounds.setHigh(2, 0);
     r3->setBounds(posbounds);
 
@@ -278,9 +278,9 @@ void planWithSimpleSetup()
 
     ob::ScopedState<> start(space);
     start.random();
-    start[0] = -199;
+    start[0] = -99;
     start[1] = 0;
-    start[2] = -20;
+    start[2] = -25;
 
     start[3] = 0;
     start[4] = 0;
@@ -299,22 +299,48 @@ void planWithSimpleSetup()
     public:
         CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
         {
-            threshold_ = 0.5;
+            threshold_ = 0.1;
         }
 
         double distanceGoal(const ob::State *st) const override
-        {
-
+        {       
+            // Runway; 0<x<50; z<0; -5<y<5
             double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
-            double dz = fabs(pos[2] + 0.2);
+            double x = pos[0];
+            double y = pos[1];
+            double z = pos[2];
 
             double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            double xdot = fabs(vel[0]);
-            double ydot = fabs(vel[1]);
-            double zdot = fabs(vel[2]);
+            double xdot = vel[0];
+            double ydot = vel[1];
+            double zdot = vel[2];
 
+            double dx;
+            double dy;
+            double dz;
+
+            if (0 < x && x < 50){
+                dx = 0;
+            }
+            else{
+                dx = fmin(fabs(x-50), fabs(x));
+            }
+
+            if (-2.5 < y && y < 2.5){
+                dy = 0;
+            }
+            else{
+                dy = fmin(fabs(y-2.5), fabs(y+2.5));
+            }
+            
+            if (z > -0.5){
+                dz = 0;
+            }
+            else{
+                dz = fabs(z);
+            }
             // std::cout << pos[0] <<"\n";
-            return sqrt(dz * dz + zdot * zdot + ydot * ydot + xdot * xdot);
+            return sqrt(dx*dx+dy*dy+dz*dz);
         }
     };
     ss.setStartState(start);
@@ -349,7 +375,7 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(.5 * 60.0);
+    ob::PlannerStatus solved = ss.solve(3 * 60.0);
 
     // std::cout << "NOT HERE **********************\n";
 
