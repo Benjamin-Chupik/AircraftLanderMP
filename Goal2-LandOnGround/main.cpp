@@ -170,7 +170,7 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
 }
 
 // This is a callback method invoked after numerical integration.
-void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
+void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
 
     //  Normalize orientation between 0 and 2*pi
@@ -186,17 +186,7 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
     double z = pos[2];
-    //    ob::ScopedState<ob::SE2StateSpace>
-    /*
-    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
 
-    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
-    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-
-    // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
-    */
     if (z > 0)
     {
         return false;
@@ -212,6 +202,33 @@ class DemoControlSpace : public oc::RealVectorControlSpace
 public:
     DemoControlSpace(const ob::StateSpacePtr &stateSpace) : oc::RealVectorControlSpace(stateSpace, 4)
     {
+    }
+};
+
+class CustomGoal : public ob::GoalRegion
+{
+public:
+    CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
+    {
+        threshold_ = 0.5;
+    }
+
+    double distanceGoal(const ob::State *st) const override
+    {
+
+        double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+        double dz = fabs(pos[2] + 0.2);
+
+        // Get stuff out of vector
+        double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+        double xdot = fabs(vel[0]);
+        double ydot = fabs(vel[1]);
+        double zdot = fabs(vel[2]);
+
+        // Goal weighting
+        double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
+        double zPosNorm = sqrt(dz * dz);
+        return zPosNorm + velocity;
     }
 };
 
@@ -272,18 +289,20 @@ void planWithSimpleSetup()
     // set state validity checking for this space
     oc::SpaceInformation *si = ss.getSpaceInformation().get();
 
-    si->setMinControlDuration(1);
-    si->setMaxControlDuration(10);
-    si->setPropagationStepSize(0.1);
+    // Change integration and control timings
+    si->setMinControlDuration(1);    // Lowest step of control
+    si->setMaxControlDuration(10);   // Highest step osf control
+    si->setPropagationStepSize(0.1); // Step size of time
 
     ss.setStateValidityChecker([si](const ob::State *state)
                                { return isStateValid(si, state); });
 
-    // Use the ODESolver to propagate the system.  Call KinematicCarPostIntegration
+    // Use the ODESolver to propagate the system.  Call PostIntegration
     // when integration has finished to normalize the orientation values.
     auto odeSolver(std::make_shared<oc::ODEBasicSolver<>>(ss.getSpaceInformation(), &TempestODE));
-    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &KinematicCarPostIntegration));
+    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &PostIntegration));
 
+    // Make start vector
     ob::ScopedState<> start(space);
     start.random();
     start[0] = -199;
@@ -302,66 +321,22 @@ void planWithSimpleSetup()
     start[10] = 0;
     start[11] = 0;
 
-    class CustomGoal : public ob::GoalRegion
-    {
-    public:
-        CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
-        {
-            threshold_ = 0.5;
-        }
-
-        double distanceGoal(const ob::State *st) const override
-        {
-
-            double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
-            double dz = fabs(pos[2] + 0.2);
-
-            double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            double xdot = fabs(vel[0]);
-            double ydot = fabs(vel[1]);
-            double zdot = fabs(vel[2]);
-
-            double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
-            double zPosNorm = sqrt(dz * dz);
-            return zPosNorm + velocity;
-        }
-    };
+    // Set start and goal positions
     ss.setStartState(start);
     ss.setGoal(std::make_shared<CustomGoal>(ss.getSpaceInformation()));
-    /*
-    ob::ScopedState<> goal(space);
-    goal.random();
-    goal[0] = 0;
-    goal[1] = 0;
-    goal[2] = -0.2;
 
-    goal[3] = 0;
-    goal[4] = 0;
-    goal[5] = 0;
-
-    goal[6] = 0;
-    goal[7] = 0;
-    goal[8] = 0;
-
-    goal[9] = 0;
-    goal[10] = 0;
-    goal[11] = 0;
-
-    ss.setStartAndGoalStates(start, goal, 15);
-    */
-    // Change Planner
+    // Change Planner to SST
     ompl::base::PlannerPtr planner(new oc::SST(ss.getSpaceInformation()));
     ss.setPlanner(planner);
 
     // Finalize setup
     ss.setup();
 
-    // ss.print();
+    // ss.print(); // Print the setup information
 
     ob::PlannerStatus solved = ss.solve(2 * 60.0);
 
-    // std::cout << "NOT HERE **********************\n";
-
+    // Displaying information
     if (solved)
     {
         std::cout << "Found solution:" << std::endl;
@@ -380,9 +355,11 @@ void planWithSimpleSetup()
         myfile_geo.open("OutputPath_geo.data");   // geometric data
         myfile_cont.open("OutputPath_cont.data"); // control data
 
+        // Print solution to files
         ss.getSolutionPath().asGeometric().printAsMatrix(myfile_geo);
         ss.getSolutionPath().printAsMatrix(myfile_cont);
 
+        // Close files
         myfile_geo.close();
         myfile_cont.close();
     }
