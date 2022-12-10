@@ -159,7 +159,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // If the z component is less than 0.5 meters its on the ground, y and z velocity is less than 0.5 m/s
-    if (q[2] > -1) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
+    if (q[2] > -.2) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
     {
         groundDynamics(q, control, qdot);
     }
@@ -233,9 +233,9 @@ void planWithSimpleSetup()
     ob::RealVectorBounds posbounds(3);
     posbounds.setLow(0, -200);
     posbounds.setHigh(0, 200);
-    posbounds.setLow(1, -200);
-    posbounds.setHigh(1, 200);
-    posbounds.setLow(2, -200);
+    posbounds.setLow(1, -50);
+    posbounds.setHigh(1, 50);
+    posbounds.setLow(2, -50);
     posbounds.setHigh(2, 0);
     r3->setBounds(posbounds);
 
@@ -321,8 +321,9 @@ void planWithSimpleSetup()
             double ydot = fabs(vel[1]);
             double zdot = fabs(vel[2]);
 
-            // std::cout << pos[0] <<"\n";
-            return sqrt(dz * dz + (zdot * zdot) + ydot * ydot + xdot * xdot);
+            double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
+            double zPosNorm = sqrt(dz * dz);
+            return zPosNorm + velocity;
         }
     };
     ss.setStartState(start);
@@ -357,7 +358,7 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(10 * 60.0);
+    ob::PlannerStatus solved = ss.solve(2 * 60.0);
 
     // std::cout << "NOT HERE **********************\n";
 
