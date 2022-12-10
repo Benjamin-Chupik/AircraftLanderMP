@@ -18,6 +18,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import sqrt
 
+
 def set_axes_equal(ax):
     '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
     cubes as cubes, etc..  This is one possible solution to Matplotlib's
@@ -46,6 +47,7 @@ def set_axes_equal(ax):
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
+
 def main():
     # import path
     geoPath = np.genfromtxt("./build/Debug/OutputPath_geo.data", delimiter=" ")
@@ -67,6 +69,11 @@ def main():
     pitch_dot = geoPath[:, 10]
     yaw_dot = geoPath[:, 11]
 
+    nData = np.shape(x)[0]
+
+    # -----------------------------------------------------------------------------------
+    # Plot Position and velocity map
+    # -----------------------------------------------------------------------------------
     # get color map for velocity
     geo_velocity = sqrt(x_dot**2+y_dot**2+z_dot**2)
 
@@ -85,11 +92,50 @@ def main():
     set_axes_equal(ax)
     fig.colorbar(sc, label='Velocity')
 
+    # Position Plots
+
+    fig, axs = plt.subplots(3)
+    fig.tight_layout()
+    axs[0].plot(np.arange(0, nData), x)
+    axs[0].set_xlabel("Geo State Number")
+    axs[0].set_ylabel("x Position")
+    axs[0].set_title("x Position")
+
+    axs[1].plot(np.arange(0, nData), y)
+    axs[1].set_xlabel("Geo State Number")
+    axs[1].set_ylabel("y Position")
+    axs[1].set_title("y Position")
+
+    axs[2].plot(np.arange(0, nData), z)
+    axs[2].set_xlabel("Geo State Number")
+    axs[2].set_ylabel("z Position")
+    axs[2].set_title("z Position")
+
+    # -----------------------------------------------------------------------------------
+    # Plot Angles
+    # -----------------------------------------------------------------------------------
+    fig, axs = plt.subplots(3)
+    fig.tight_layout()
+    axs[0].plot(np.arange(0, nData), np.rad2deg(roll))
+    axs[0].set_xlabel("Geo State Number")
+    axs[0].set_ylabel("Roll Angle [deg]")
+    axs[0].set_title("Roll Angle")
+
+    axs[1].plot(np.arange(0, nData), np.rad2deg(pitch))
+    axs[1].set_xlabel("Geo State Number")
+    axs[1].set_ylabel("pitch Angle [deg]")
+    axs[1].set_title("pitch Angle")
+
+    axs[2].plot(np.arange(0, nData), np.rad2deg(yaw))
+    axs[2].set_xlabel("Geo State Number")
+    axs[2].set_ylabel("yaw Angle[deg]")
+    axs[2].set_title("yaw Angle")
+
 
 # -----------------------------------------------------------------------------------------------------
 # Have main at the bottom call so functions are all declared
 # -----------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     main()
-    
+
     plt.show()
