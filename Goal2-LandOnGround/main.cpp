@@ -41,7 +41,6 @@ namespace ob = ompl::base;
 namespace oc = ompl::control;
 
 // Definition of the ODE
-// Gound
 void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // TODO: hard coded the wind thing
@@ -174,12 +173,12 @@ void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*
 {
 
     //  Normalize orientation between 0 and 2*pi
-    ompl::base::SO2StateSpace SO2;
+    ompl::base::SO2StateSpace SO2; // make a class so we have acsess to the bounds function
 
+    // Enforce the bounds on all the angle states
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
-    // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
@@ -236,28 +235,25 @@ void planWithSimpleSetup()
 {
     // auto space(std::make_shared<ob::SE3StateSpace>());
     //  Make state space (R3, SO2x3, R6)
-    // ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3));
-    // auto r3(std::make_shared<ob::SE3StateSpace>());
-    auto r3(std::make_shared<ob::RealVectorStateSpace>(3));
-    // ob::StateSpacePtr so2(new ob::SO2StateSpace());
-    auto so21(std::make_shared<ob::SO2StateSpace>());
-    auto so22(std::make_shared<ob::SO2StateSpace>());
-    auto so23(std::make_shared<ob::SO2StateSpace>());
-    // ob::StateSpacePtr r6(new ob::RealVectorStateSpace(6));
-    auto r6(std::make_shared<ob::RealVectorStateSpace>(6));
+    auto r3(std::make_shared<ob::RealVectorStateSpace>(3)); // R^3 (position)
+    auto so21(std::make_shared<ob::SO2StateSpace>());       // so2 (roll)
+    auto so22(std::make_shared<ob::SO2StateSpace>());       // so2 (pitch)
+    auto so23(std::make_shared<ob::SO2StateSpace>());       // so2 (yaw)
+    auto r6(std::make_shared<ob::RealVectorStateSpace>(6)); // R^6 (position velocity, anguar velocity)
 
-    // Make Bounds
-    ob::RealVectorBounds posbounds(3);
-    posbounds.setLow(0, -200);
-    posbounds.setHigh(0, 200);
-    posbounds.setLow(1, -50);
-    posbounds.setHigh(1, 50);
-    posbounds.setLow(2, -50);
-    posbounds.setHigh(2, 0);
-    r3->setBounds(posbounds);
-
-    ob::RealVectorBounds velbounds(6);
-    velbounds.setLow(-50);
+    // Make State Space Bounds (so2 bounds allready fixed)
+    ob::RealVectorBounds posbounds(3); // Position
+    ob::RealVectorBounds velbounds(6); // Velocities
+    // Position bounds
+    posbounds.setLow(0, -200); // x
+    posbounds.setHigh(0, 200); // x
+    posbounds.setLow(1, -50);  // y
+    posbounds.setHigh(1, 50);  // y
+    posbounds.setLow(2, -50);  // z
+    posbounds.setHigh(2, 0);   // z
+    r3->setBounds(posbounds);  // set the bounds
+    // Velocity bounds
+    velbounds.setLow(-50); // TODO: make these bounds more realisitc
     velbounds.setHigh(100);
     r6->setBounds(velbounds);
 
@@ -269,17 +265,14 @@ void planWithSimpleSetup()
 
     // set the bounds for the control space
     ob::RealVectorBounds cbounds(4); // 4 dim control space
-    cbounds.setLow(0, -.4);
-    cbounds.setHigh(0, .4);
-
-    cbounds.setLow(1, -.4);
-    cbounds.setHigh(1, .4);
-
-    cbounds.setLow(2, -.4);
-    cbounds.setHigh(2, .4);
-
-    cbounds.setLow(3, -.7);
-    cbounds.setHigh(3, .7);
+    cbounds.setLow(0, -.4);          // elevator deflection [rads]
+    cbounds.setHigh(0, .4);          // elevator deflection [rads]
+    cbounds.setLow(1, -.4);          // aileron deflection [rads]
+    cbounds.setHigh(1, .4);          // aileron deflection [rads]
+    cbounds.setLow(2, -.4);          // rudder deflection [rads]
+    cbounds.setHigh(2, .4);          // rudder deflection [rads]
+    cbounds.setLow(3, -.7);          // Throttel Ranage (percents not newtons)
+    cbounds.setHigh(3, .7);          // Throttel Ranage
 
     cspace->setBounds(cbounds);
 
@@ -305,18 +298,19 @@ void planWithSimpleSetup()
     // Make start vector
     ob::ScopedState<> start(space);
     start.random();
+    // Position
     start[0] = -199;
     start[1] = 0;
     start[2] = -20;
-
+    // Angles
     start[3] = 0;
     start[4] = 0;
     start[5] = 0;
-
+    // Velocity
     start[6] = 15;
     start[7] = 0;
     start[8] = 0;
-
+    // Angular velocity
     start[9] = 0;
     start[10] = 0;
     start[11] = 0;
