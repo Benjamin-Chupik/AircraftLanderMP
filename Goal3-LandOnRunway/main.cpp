@@ -41,7 +41,8 @@ namespace ob = ompl::base;
 namespace oc = ompl::control;
 
 // Definition of the ODE
-void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+// Gound
+void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // TODO: hard coded the wind thing
     Eigen::Vector3d wind_inertial{0, 0, 0};
@@ -119,8 +120,49 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     qdot[11] = omega_body_dot[2];
 }
 
+void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+{
+
+    // Turn relevant states into vectors
+    Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
+    Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
+    Eigen::Vector3d vel_body{q[6], q[7], q[8]};
+    Eigen::Vector3d omega_body{q[9], q[10], q[11]};
+
+    // Kinematics
+    Eigen::Vector3d vel_inertial = TransformFromBodyToInertial(vel_body, euler_angles);
+    Eigen::Vector3d euler_rates = EulerRatesFromOmegaBody(omega_body, euler_angles);
+
+    // State Derivative
+    qdot[0] = vel_inertial[0];
+    qdot[1] = vel_inertial[1];
+    qdot[2] = vel_inertial[2];
+    qdot[3] = euler_rates[0];
+    qdot[4] = euler_rates[1];
+    qdot[5] = euler_rates[2];
+    qdot[6] = -100.0;
+    qdot[7] = 0.0;
+    qdot[8] = 0.0;
+    qdot[9] = 0.0;
+    qdot[10] = 0.0;
+    qdot[11] = 0.0;
+}
+
+void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+{
+    // If the z component is less than 0.5 meters its on the ground
+    if (q[2] > -1)
+    {
+        groundDynamics(q, control, qdot);
+    }
+    else
+    {
+        flightDynamics(q, control, qdot);
+    }
+}
+
 // This is a callback method invoked after numerical integration.
-void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
+void KinematicCarPostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
 {
 
     //  Normalize orientation between 0 and 2*pi
@@ -185,8 +227,8 @@ void planWithSimpleSetup()
     posbounds.setHigh(0, 200);
     posbounds.setLow(1, -200);
     posbounds.setHigh(1, 200);
-    posbounds.setLow(2, -2000);
-    posbounds.setHigh(2, -1800);
+    posbounds.setLow(2, -200);
+    posbounds.setHigh(2, 0);
     r3->setBounds(posbounds);
 
     ob::RealVectorBounds velbounds(6);
@@ -229,16 +271,16 @@ void planWithSimpleSetup()
     ss.setStateValidityChecker([si](const ob::State *state)
                                { return isStateValid(si, state); });
 
-    // Use the ODESolver to propagate the system.  Call PostIntegration
+    // Use the ODESolver to propagate the system.  Call KinematicCarPostIntegration
     // when integration has finished to normalize the orientation values.
     auto odeSolver(std::make_shared<oc::ODEBasicSolver<>>(ss.getSpaceInformation(), &TempestODE));
-    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &PostIntegration));
+    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &KinematicCarPostIntegration));
 
     ob::ScopedState<> start(space);
     start.random();
     start[0] = -199;
     start[1] = 0;
-    start[2] = -1950;
+    start[2] = -20;
 
     start[3] = 0;
     start[4] = 0;
@@ -252,17 +294,43 @@ void planWithSimpleSetup()
     start[10] = 0;
     start[11] = 0;
 
+    class CustomGoal : public ob::GoalRegion
+    {
+    public:
+        CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
+        {
+            threshold_ = 0.5;
+        }
+
+        double distanceGoal(const ob::State *st) const override
+        {
+
+            double *pos = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+            double dz = fabs(pos[2] + 0.2);
+
+            double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+            double xdot = fabs(vel[0]);
+            double ydot = fabs(vel[1]);
+            double zdot = fabs(vel[2]);
+
+            // std::cout << pos[0] <<"\n";
+            return sqrt(dz * dz + zdot * zdot + ydot * ydot + xdot * xdot);
+        }
+    };
+    ss.setStartState(start);
+    ss.setGoal(std::make_shared<CustomGoal>(ss.getSpaceInformation()));
+    /*
     ob::ScopedState<> goal(space);
     goal.random();
     goal[0] = 0;
     goal[1] = 0;
-    goal[2] = -1850;
+    goal[2] = -0.2;
 
     goal[3] = 0;
     goal[4] = 0;
     goal[5] = 0;
 
-    goal[6] = 20;
+    goal[6] = 0;
     goal[7] = 0;
     goal[8] = 0;
 
@@ -271,7 +339,7 @@ void planWithSimpleSetup()
     goal[11] = 0;
 
     ss.setStartAndGoalStates(start, goal, 15);
-
+    */
     // Change Planner
     ompl::base::PlannerPtr planner(new oc::SST(ss.getSpaceInformation()));
     ss.setPlanner(planner);
@@ -281,7 +349,7 @@ void planWithSimpleSetup()
 
     // ss.print();
 
-    ob::PlannerStatus solved = ss.solve(2 * 60.0);
+    ob::PlannerStatus solved = ss.solve(.5 * 60.0);
 
     // std::cout << "NOT HERE **********************\n";
 
