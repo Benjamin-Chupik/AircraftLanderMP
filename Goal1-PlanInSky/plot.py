@@ -18,6 +18,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import sqrt
 
+isSave = True
+
 dt = 0.1  # From the C++ stuff
 
 
@@ -95,8 +97,9 @@ def main():
     ax.set_zlabel("z Position")
     set_axes_equal(ax)
     fig.colorbar(sc, label='Velocity')
-    fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
-    plt.savefig("3DPlot.png")
+    if isSave:
+        fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+        plt.savefig("3DPlot.png")
 
     # Position Plots
 
@@ -116,8 +119,9 @@ def main():
     axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel("z Position")
     axs[2].set_title("z Position")
-    fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
-    plt.savefig("PositionPlots.png")
+    if isSave:
+        fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+        plt.savefig("PositionPlots.png")
 
     # -----------------------------------------------------------------------------------
     # Plot Angles
@@ -138,8 +142,9 @@ def main():
     axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel("yaw Angle[deg]")
     axs[2].set_title("yaw Angle")
-    fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
-    plt.savefig("AttitudePlots.png")
+    if isSave:
+        fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+        plt.savefig("AttitudePlots.png")
 
 
 # -----------------------------------------------------------------------------------------------------
