@@ -6,7 +6,7 @@ Plots the generated path from the main.cpp run
 
 Data file structure:
     Gemetric File
-    [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
+    [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot, time]
 
     Control File
     [x_pos, y_pos, z_pos, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot d_e, d_a, d_r, thrust, conrol duration]
@@ -69,6 +69,8 @@ def main():
     pitch_dot = geoPath[:, 10]
     yaw_dot = geoPath[:, 11]
 
+    t = geoPath[:, 12]
+
     nData = np.shape(x)[0]
 
     # -----------------------------------------------------------------------------------
@@ -96,18 +98,18 @@ def main():
 
     fig, axs = plt.subplots(3)
     fig.tight_layout()
-    axs[0].plot(np.arange(0, nData), x)
-    axs[0].set_xlabel("Geo State Number")
+    axs[0].plot(t, x)
+    axs[0].set_xlabel("Time [s]")
     axs[0].set_ylabel("x Position")
     axs[0].set_title("x Position")
 
-    axs[1].plot(np.arange(0, nData), y)
-    axs[1].set_xlabel("Geo State Number")
+    axs[1].plot(t, y)
+    axs[1].set_xlabel("Time [s]")
     axs[1].set_ylabel("y Position")
     axs[1].set_title("y Position")
 
-    axs[2].plot(np.arange(0, nData), z)
-    axs[2].set_xlabel("Geo State Number")
+    axs[2].plot(t, z)
+    axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel("z Position")
     axs[2].set_title("z Position")
 
@@ -116,18 +118,18 @@ def main():
     # -----------------------------------------------------------------------------------
     fig, axs = plt.subplots(3)
     fig.tight_layout()
-    axs[0].plot(np.arange(0, nData), np.rad2deg(roll))
-    axs[0].set_xlabel("Geo State Number")
+    axs[0].plot(t, np.rad2deg(roll))
+    axs[0].set_xlabel("Time [s]")
     axs[0].set_ylabel("Roll Angle [deg]")
     axs[0].set_title("Roll Angle")
 
-    axs[1].plot(np.arange(0, nData), np.rad2deg(pitch))
-    axs[1].set_xlabel("Geo State Number")
+    axs[1].plot(t, np.rad2deg(pitch))
+    axs[1].set_xlabel("Time [s]")
     axs[1].set_ylabel("pitch Angle [deg]")
     axs[1].set_title("pitch Angle")
 
-    axs[2].plot(np.arange(0, nData), np.rad2deg(yaw))
-    axs[2].set_xlabel("Geo State Number")
+    axs[2].plot(t, np.rad2deg(yaw))
+    axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel("yaw Angle[deg]")
     axs[2].set_title("yaw Angle")
 
