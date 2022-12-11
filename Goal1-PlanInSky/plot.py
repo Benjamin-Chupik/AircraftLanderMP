@@ -6,10 +6,10 @@ Plots the generated path from the main.cpp run
 
 Data file structure:
     Gemetric File
-    [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot, time]
+    [x, y, z, roll, pitch, yaw , x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot]
 
     Control File
-    [x_pos, y_pos, z_pos, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot d_e, d_a, d_r, thrust, conrol duration]
+    [x, y, z, roll, pitch, yaw , x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot, d_e, d_a, d_r, thrust, conrol duration]
 
 """
 
@@ -61,9 +61,9 @@ def main():
     y = geoPath[:, 1]
     z = -geoPath[:, 2]  # NED
 
-    yaw = geoPath[:, 3]
+    yaw = geoPath[:, 5]
     pitch = geoPath[:, 4]
-    roll = geoPath[:, 5]
+    roll = geoPath[:, 3]
 
     x_dot = geoPath[:, 6]
     y_dot = geoPath[:, 7]
@@ -73,7 +73,14 @@ def main():
     pitch_dot = geoPath[:, 10]
     yaw_dot = geoPath[:, 11]
 
+    de = contPath[:, 12]
+    da = contPath[:, 13]
+    dr = contPath[:, 14]
+    thrust = contPath[:, 15]
+
     t = np.arange(0, 0.1*np.shape(x)[0], 0.1)
+
+    t_cont = np.cumsum(contPath[:, 16])
 
     nData = np.shape(x)[0]
 
@@ -135,16 +142,44 @@ def main():
 
     axs[1].plot(t, np.rad2deg(pitch))
     axs[1].set_xlabel("Time [s]")
-    axs[1].set_ylabel("pitch Angle [deg]")
-    axs[1].set_title("pitch Angle")
+    axs[1].set_ylabel("Pitch Angle [deg]")
+    axs[1].set_title("Pitch Angle")
 
     axs[2].plot(t, np.rad2deg(yaw))
     axs[2].set_xlabel("Time [s]")
-    axs[2].set_ylabel("yaw Angle[deg]")
-    axs[2].set_title("yaw Angle")
+    axs[2].set_ylabel("Yaw Angle[deg]")
+    axs[2].set_title("Yaw Angle")
     if isSave:
         fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
         plt.savefig("AttitudePlots.png")
+
+    # -----------------------------------------------------------------------------------
+    # Plot controls
+    # -----------------------------------------------------------------------------------
+    fig, axs = plt.subplots(4)
+    fig.tight_layout()
+    axs[0].plot(t_cont, de)
+    axs[0].set_xlabel("Time [s]")
+    axs[0].set_ylabel("Elevator Control")
+    axs[0].set_title("Elevator Control")
+
+    axs[1].plot(t_cont, da)
+    axs[1].set_xlabel("Time [s]")
+    axs[1].set_ylabel("Aileron Control")
+    axs[1].set_title("Aileron Control")
+
+    axs[2].plot(t_cont, dr)
+    axs[2].set_xlabel("Time [s]")
+    axs[2].set_ylabel("Rudder Control")
+    axs[2].set_title("Rudder Control")
+
+    axs[3].plot(t_cont, thrust)
+    axs[3].set_xlabel("Time [s]")
+    axs[3].set_ylabel("Thrust Control")
+    axs[3].set_title("Thrust Control")
+    if isSave:
+        fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+        plt.savefig("ControlInputsPlots.png")
 
 
 # -----------------------------------------------------------------------------------------------------

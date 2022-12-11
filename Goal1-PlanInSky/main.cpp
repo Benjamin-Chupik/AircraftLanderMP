@@ -4,7 +4,7 @@ For algorithmic motion planning
 Main function for final project
 
 From tempest file:
-State Vector: [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
+State Vector: [x, y, z, roll, pitch, yaw , x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot]
 Input Vector: [d_e, d_a, d_r, t] (elevator, aileron, ruder, thrust)
 
 Axis Frame: NED (so z needs to be negative)
