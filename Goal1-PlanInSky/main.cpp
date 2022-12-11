@@ -15,7 +15,6 @@ Axis Frame: NED (so z needs to be negative)
 // Program Setup
 //--------------------------------------------------------------------
 #include <ompl/control/SpaceInformation.h>
-#include <ompl/base/spaces/TimeStateSpace.h>
 #include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
@@ -120,7 +119,6 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     qdot[9] = omega_body_dot[0];
     qdot[10] = omega_body_dot[1];
     qdot[11] = omega_body_dot[2];
-    qdot[12] = 1; // Time update
 }
 
 // This is a callback method invoked after numerical integration.
@@ -172,7 +170,6 @@ void planWithSimpleSetup()
     auto so22(std::make_shared<ob::SO2StateSpace>());       // so2 (pitch)
     auto so23(std::make_shared<ob::SO2StateSpace>());       // so2 (yaw)
     auto r6(std::make_shared<ob::RealVectorStateSpace>(6)); // R^6 (position velocity, anguar velocity)
-    auto t(std::make_shared<ob::TimeStateSpace>());         // R (time)
 
     // Make Bounds
     ob::RealVectorBounds posbounds(3);
@@ -190,7 +187,7 @@ void planWithSimpleSetup()
     r6->setBounds(velbounds);
 
     // Combine smaller spaces into big main space
-    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6 + t;
+    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
 
     // create a control space
     auto cspace(std::make_shared<DemoControlSpace>(space));

@@ -18,6 +18,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import sqrt
 
+dt = 0.1  # From the C++ stuff
+
 
 def set_axes_equal(ax):
     '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
@@ -69,7 +71,7 @@ def main():
     pitch_dot = geoPath[:, 10]
     yaw_dot = geoPath[:, 11]
 
-    t = geoPath[:, 12]
+    t = np.arange(0, 0.1*np.shape(x)[0], 0.1)
 
     nData = np.shape(x)[0]
 
@@ -93,6 +95,8 @@ def main():
     ax.set_zlabel("z Position")
     set_axes_equal(ax)
     fig.colorbar(sc, label='Velocity')
+    fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+    plt.savefig("3DPlot.png")
 
     # Position Plots
 
@@ -112,6 +116,8 @@ def main():
     axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel("z Position")
     axs[2].set_title("z Position")
+    fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+    plt.savefig("PositionPlots.png")
 
     # -----------------------------------------------------------------------------------
     # Plot Angles
@@ -132,6 +138,8 @@ def main():
     axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel("yaw Angle[deg]")
     axs[2].set_title("yaw Angle")
+    fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
+    plt.savefig("AttitudePlots.png")
 
 
 # -----------------------------------------------------------------------------------------------------
