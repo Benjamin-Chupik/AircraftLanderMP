@@ -4,7 +4,7 @@ For algorithmic motion planning
 Main function for final project
 
 From tempest file:
-State Vector: [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
+State Vector: [x, y, z, roll, pitch, yaw , x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot, time]
 Input Vector: [d_e, d_a, d_r, t] (elevator, aileron, ruder, thrust)
 
 Axis Frame: NED (so z needs to be negative)
@@ -55,7 +55,7 @@ const double maxAOA = 0.261799; // 15 deg in radians
 
 // Definition of the ODE
 void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
-{    
+{
 
     // TempestODE - This function adapted for c++ from function provided by Professor Eric Frew. Adapted by Roland Ilyes
 
@@ -177,7 +177,6 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     Eigen::Vector3d grav_vec{(-sin(euler_angles[1])), (sin(euler_angles[0]) * cos(euler_angles[1])), (cos(euler_angles[0]) * cos(euler_angles[1]))};
     fg_body = (ap.g * ap.m) * grav_vec;
     vel_body_dot = (-1 * (omega_body.cross(vel_body))) + ((1 / ap.m) * (fg_body + fa_body));
-    
 
     // State Derivative
     qdot[0] = vel_inertial[0];
@@ -294,8 +293,8 @@ public:
 
         // Break the state apart into components (roll, pitch, yaw)
         double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
-        double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
-        double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+        double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+        double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
 
         // Break the state apart into components (velocity)
         double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
