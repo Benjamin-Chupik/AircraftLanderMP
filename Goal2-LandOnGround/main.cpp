@@ -240,7 +240,7 @@ public:
         double anglenorm = sqrt(pitch * pitch + roll * roll);
 
         // Goal weighting of vectors (more weight is more important)
-        return zPosNorm + velocity + 0. * anglenorm;
+        return zPosNorm + velocity + 0.4 * anglenorm;
     }
 };
 
