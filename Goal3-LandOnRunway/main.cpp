@@ -4,7 +4,7 @@ For algorithmic motion planning
 Main function for final project
 
 From tempest file:
-State Vector: [x, y, z, yaw, pitch, roll, x_dot, y_dot, z_dot, yaw_dot, pitch_dot, roll_dot]
+State Vector: [x, y, z, roll, pitch, yaw, x_dot, y_dot, z_dot, roll_dot, pitch_dot, yaw_dot]
 Input Vector: [d_e, d_a, d_r, t] (elevator, aileron, ruder, thrust)
 
 Axis Frame: NED (so z needs to be negative)
@@ -45,20 +45,20 @@ namespace oc = ompl::control;
 Eigen::Vector3d wind_inertial{0, 0, 0};
 
 //
-double max_alpha = 0.261799;
-double mu_ground = 0.4;
+double max_alpha = 0.261799; //15 deg in rad
+double mu_ground = 0.7; // fricction coefficient on ground
 
 // Runway limits
-const double xmin = -100;
-const double xmax = 100;
+const double xmin = -80;
+const double xmax = 120;
 
-const double ymin = -5;
-const double ymax = 5;
+const double ymin = 0;
+const double ymax = 100;
 
 const double zmax = -0.2;
 
 const double xdotgoal = 1;
-const double zdotgoal = 1;
+const double zdotgoal = 2;
 
 // Definition of the ODE
 void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
@@ -259,16 +259,16 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     double z = pos[2];
     
 
-    double yaw = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
+    double roll = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
     double pitch = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
-    double roll = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+    double yaw = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
 
     
     // Limiting angle of attack
     double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
     double alpha = atan2(vel[2],vel[0]);
 
-    Eigen::Vector3d eu_angles {yaw, pitch, roll};
+    Eigen::Vector3d eu_angles {roll, pitch, yaw};
 	Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
     Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
     //    ob::ScopedState<ob::SE2StateSpace>
@@ -318,7 +318,7 @@ class CustomGoal : public ob::GoalRegion
     public:
         CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
         {
-            threshold_ = 0.5;
+            threshold_ = 5;
         }
 
         double distanceGoal(const ob::State *st) const override
@@ -333,12 +333,12 @@ class CustomGoal : public ob::GoalRegion
             double y = pos[1];
             double z = pos[2];
 
-            double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
+            double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
             double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
-            double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+            double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
     
             double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            Eigen::Vector3d eu_angles {yaw, pitch, roll};
+            Eigen::Vector3d eu_angles {roll, pitch, yaw};
             Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
             Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
 
@@ -366,7 +366,7 @@ class CustomGoal : public ob::GoalRegion
             else{
                 dy = fmin(fabs(y-ymin), fabs(y+ymax));
             }
-            
+            /*
             if (z > zmax){
                 dz = 0;
                 zdot_in = 0;
@@ -378,21 +378,24 @@ class CustomGoal : public ob::GoalRegion
             if (xdot_in < xdotgoal){
                 xdot_in = 0;
             }
-
-            double velocity = sqrt(3* zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in);
-            double runwaynorm = sqrt(dx*dx+dy*dy+ dz*dz);
-            double anglenorm;
-
-
+            */
             if (z > zmax){
-                anglenorm = 0;
+                dz = 0;
             }
             else{
-                anglenorm = sqrt(pitch*pitch + roll*roll);
-            }
+                dz = 5*fabs(z);
+
+            double velocity = sqrt(3*zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in);
+            double runwaynorm = sqrt(dx*dx + dy*dy+ dz*dz);
+            double anglenorm;
+
+            double goalyaw = 1.57;
+            anglenorm = sqrt(pitch*pitch + roll*roll + 10*fabs(yaw-goalyaw));
+            
             
 
             return runwaynorm + velocity + anglenorm;
+        }
         }
     };
 void planWithSimpleSetup()
@@ -410,10 +413,10 @@ void planWithSimpleSetup()
     ob::RealVectorBounds velbounds(6); // Velocities
     // Position bounds
     posbounds.setLow(0, -100); // x
-    posbounds.setHigh(0, 100); // x
-    posbounds.setLow(1, -50);  // y
-    posbounds.setHigh(1, 50);  // y
-    posbounds.setLow(2, -50);  // z
+    posbounds.setHigh(0, 120); // x
+    posbounds.setLow(1, -100);  // y
+    posbounds.setHigh(1, 100);  // y
+    posbounds.setLow(2, -25);  // z
     posbounds.setHigh(2, 0);   // z
     r3->setBounds(posbounds);  // set the bounds
     // Velocity bounds
@@ -430,7 +433,7 @@ void planWithSimpleSetup()
     // set the bounds for the control space
     ob::RealVectorBounds cbounds(4); // 4 dim control space
     cbounds.setLow(0, -.8);
-    cbounds.setHigh(0, .4);
+    cbounds.setHigh(0, .8);
 
     cbounds.setLow(1, -.4);
     cbounds.setHigh(1, .4);
@@ -466,8 +469,8 @@ void planWithSimpleSetup()
     ob::ScopedState<> start(space);
     start.random();
     // Position
-    start[0] = -99;
-    start[1] = 0;
+    start[0] = -100;
+    start[1] = -100;
     start[2] = -25;
     // Angles
     start[3] = 0;
@@ -495,7 +498,7 @@ void planWithSimpleSetup()
 
     // ss.print(); // Print the setup information
 
-    ob::PlannerStatus solved = ss.solve(2 * 60.0);
+    ob::PlannerStatus solved = ss.solve(5 * 60.0);
 
     // Displaying information
     if (solved)

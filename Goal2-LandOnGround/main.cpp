@@ -40,6 +40,13 @@ Axis Frame: NED (so z needs to be negative)
 namespace ob = ompl::base;
 namespace oc = ompl::control;
 
+// Constants
+const double zmax = -0.2;
+double mu_ground = 0.6; // fricction coefficient on ground
+
+const double xdotgoal = 1;
+const double zdotgoal = 2;
+
 // TODO: hard coded the wind thing
 Eigen::Vector3d wind_inertial{0, 0, 0};
 
@@ -164,6 +171,12 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
 
     Eigen::Vector3d omega_body_dot;
     omega_body_dot = inertia_matrix.inverse() * ((-1 * omega_body.cross(inertia_matrix * omega_body)) + ma_body);
+    Eigen::Vector3d vel_body_dot;
+    Eigen::Vector3d fg_body;
+
+    Eigen::Vector3d grav_vec{(-sin(euler_angles[1])), (sin(euler_angles[0]) * cos(euler_angles[1])), (cos(euler_angles[0]) * cos(euler_angles[1]))};
+    fg_body = (ap.g * ap.m) * grav_vec;
+    vel_body_dot = (-1 * (omega_body.cross(vel_body))) + ((1 / ap.m) * (fg_body + fa_body));
     
 
     // State Derivative
@@ -175,7 +188,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[4] = 0;
     qdot[5] = 0;
 
-    qdot[6] = -5.0;
+    qdot[6] = -ap.g*mu_ground + vel_body_dot[0];
     qdot[7] = 0.0;
     qdot[8] = 0.0;
 
@@ -190,7 +203,7 @@ void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, o
     qdot[12] = 1; // Time update
 
     // If the z component is less than 0.5 meters its on the ground, y and z velocity is less than 0.5 m/s
-    if (q[2] > -.2) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
+    if (q[2] > zmax) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
     {
         groundDynamics(q, control, qdot);
     }
@@ -217,11 +230,23 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
     // Unpack vectors
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
-    double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+    double x = pos[0];
+    double y = pos[1];
     double z = pos[2];
+    
 
-    // Calculate angle of attack
-    double alpha = atan2(vel[2], vel[0]);
+    double yaw = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
+    double pitch = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
+    double roll = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+
+    
+    // Limiting angle of attack
+    double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+    double alpha = atan2(vel[2],vel[0]);
+
+    Eigen::Vector3d eu_angles {yaw, pitch, roll};
+	Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
+    Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
 
     if (z > 0 || alpha > maxAOA)
     {
@@ -229,7 +254,17 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     }
     else
     {
-        return true;
+        if (z > zmax){
+            if (vel_inert[2] < zdotgoal){ //&& vel_inert[2] < zdotgoal
+            return true;
+            }
+            else{
+                return false;
+            }
+        }
+        else{
+            return true;
+        }
     }
 }
 
@@ -264,15 +299,18 @@ public:
 
         // Break the state apart into components (velocity)
         double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-        double xdot = vel[0];
-        double ydot = vel[1];
-        double zdot = vel[2];
+        Eigen::Vector3d eu_angles {yaw, pitch, roll};
+        Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
+        Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
 
+        double xdot_in = vel_inert[0];
+        double ydot_in = vel_inert[1];
+        double zdot_in = vel_inert[2];
         //
         double dz = fabs(z);
 
         // Goal vectors
-        double velocity = sqrt(zdot * zdot + ydot * ydot + xdot * xdot);
+        double velocity = sqrt(zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in);
         double zPosNorm = sqrt(dz * dz);
         double anglenorm = sqrt(pitch * pitch + roll * roll);
 
@@ -378,7 +416,7 @@ void planWithSimpleSetup()
 
     // ss.print(); // Print the setup information
 
-    ob::PlannerStatus solved = ss.solve(2 * 60.0);
+    ob::PlannerStatus solved = ss.solve(5 * 60.0);
 
     // Displaying information
     if (solved)
