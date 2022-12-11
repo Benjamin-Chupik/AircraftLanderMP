@@ -167,12 +167,12 @@ void planWithSimpleSetup()
 {
 
     // Make State Spaces
-    auto r3(std::make_shared<ob::RealVectorStateSpace>(3));
-    auto so21(std::make_shared<ob::SO2StateSpace>());
-    auto so22(std::make_shared<ob::SO2StateSpace>());
-    auto so23(std::make_shared<ob::SO2StateSpace>());
-    auto r6(std::make_shared<ob::RealVectorStateSpace>(6));
-    auto t(std::make_shared<ob::TimeStateSpace>());
+    auto r3(std::make_shared<ob::RealVectorStateSpace>(3)); // R^3 (position)
+    auto so21(std::make_shared<ob::SO2StateSpace>());       // so2 (roll)
+    auto so22(std::make_shared<ob::SO2StateSpace>());       // so2 (pitch)
+    auto so23(std::make_shared<ob::SO2StateSpace>());       // so2 (yaw)
+    auto r6(std::make_shared<ob::RealVectorStateSpace>(6)); // R^6 (position velocity, anguar velocity)
+    auto t(std::make_shared<ob::TimeStateSpace>());         // R (time)
 
     // Make Bounds
     ob::RealVectorBounds posbounds(3);
