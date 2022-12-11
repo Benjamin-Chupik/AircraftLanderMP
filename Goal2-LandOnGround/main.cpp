@@ -40,11 +40,12 @@ Axis Frame: NED (so z needs to be negative)
 namespace ob = ompl::base;
 namespace oc = ompl::control;
 
+// TODO: hard coded the wind thing
+Eigen::Vector3d wind_inertial{0, 0, 0};
+
 // Definition of the ODE
 void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
-{
-    // TODO: hard coded the wind thing
-    Eigen::Vector3d wind_inertial{0, 0, 0};
+{    
 
     // TempestODE - This function adapted for c++ from function provided by Professor Eric Frew. Adapted by Roland Ilyes
 
@@ -137,12 +138,37 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     Eigen::Vector3d vel_inertial = TransformFromBodyToInertial(vel_body, euler_angles);
     Eigen::Vector3d euler_rates = EulerRatesFromOmegaBody(omega_body, euler_angles);
 
+    // Allowing yaw correction on runway
+    struct params ap;
+
+    Eigen::Matrix3d inertia_matrix{
+        {ap.Ix, 0, ap.Ixz},
+        {0, ap.Iy, 0},
+        {-ap.Ixz, 0, ap.Iz}};
+
+    Eigen::Vector3d fa_body;
+    Eigen::Vector3d ma_body;
+    Eigen::Vector3d wind_angles;
+
+    double density = Formulae::barometricDensity(-pos_inertial[2]);
+    const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
+
+    // Pitch, roll and their derivatives set to 0
+    Eigen::Matrix<double, 12, 1> q_pert{q[0], q[1], q[2], q[3], 0, 0, q[6], q[7], q[8], q[9], 0, 0};
+    Eigen::Vector4d u_as_vec{0, 0, u[2], 0};
+
+    std::tie(fa_body, ma_body, wind_angles) = AeroForcesAndMoments_BodyState_WindCoeffs(q_pert, u_as_vec, wind_inertial, density);
+
+    Eigen::Vector3d omega_body_dot;
+    omega_body_dot = inertia_matrix.inverse() * ((-1 * omega_body.cross(inertia_matrix * omega_body)) + ma_body);
+    
+
     // State Derivative
     qdot[0] = vel_inertial[0];
     qdot[1] = vel_inertial[1];
     qdot[2] = 0;
 
-    qdot[3] = 0;
+    qdot[3] = euler_rates[0];
     qdot[4] = 0;
     qdot[5] = 0;
 
@@ -150,7 +176,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[7] = 0.0;
     qdot[8] = 0.0;
 
-    qdot[9] = 0.0;
+    qdot[9] = omega_body_dot[0];
     qdot[10] = 0.0;
     qdot[11] = 0.0;
 }
@@ -271,8 +297,8 @@ void planWithSimpleSetup()
     cbounds.setHigh(1, .4);          // aileron deflection [rads]
     cbounds.setLow(2, -.4);          // rudder deflection [rads]
     cbounds.setHigh(2, .4);          // rudder deflection [rads]
-    cbounds.setLow(3, -.7);          // Throttel Ranage (percents not newtons)
-    cbounds.setHigh(3, .7);          // Throttel Ranage
+    cbounds.setLow(3, -.7);          // Throttle Ranage (percents not newtons)
+    cbounds.setHigh(3, .7);          // Throttle Ranage
 
     cspace->setBounds(cbounds);
 
