@@ -136,6 +136,8 @@ def main():
 # Have main at the bottom call so functions are all declared
 # -----------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
+    plt.style.use('ggplot')
+
     main()
 
     plt.show()
