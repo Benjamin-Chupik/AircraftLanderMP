@@ -15,7 +15,7 @@ Axis Frame: NED (so z needs to be negative)
 // Program Setup
 //--------------------------------------------------------------------
 #include <ompl/control/SpaceInformation.h>
-// #include <ompl/extensions/ode/OpenDEStateSpace.h>
+#include <ompl/base/spaces/TimeStateSpace.h>
 #include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
@@ -39,6 +39,9 @@ Axis Frame: NED (so z needs to be negative)
 // Name Spaces
 namespace ob = ompl::base;
 namespace oc = ompl::control;
+
+// Constants
+const double maxAOA = 0.261799; // 15 deg in radians
 
 // Definition of the ODE
 void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
@@ -146,7 +149,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[4] = 0;
     qdot[5] = 0;
 
-    qdot[6] = -10.0;
+    qdot[6] = -5.0;
     qdot[7] = 0.0;
     qdot[8] = 0.0;
 
@@ -157,6 +160,9 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
 
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
+    // Update time component (does not change in either dynamics)
+    qdot[12] = 1; // Time update
+
     // If the z component is less than 0.5 meters its on the ground, y and z velocity is less than 0.5 m/s
     if (q[2] > -.2) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
     {
@@ -183,10 +189,15 @@ void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
+    // Unpack vectors
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+    double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
     double z = pos[2];
 
-    if (z > 0)
+    // Calculate angle of attack
+    double alpha = atan2(vel[2], vel[0]);
+
+    if (z > 0 || alpha > maxAOA)
     {
         return false;
     }
@@ -246,13 +257,13 @@ public:
 
 void planWithSimpleSetup()
 {
-    // auto space(std::make_shared<ob::SE3StateSpace>());
     //  Make state space (R3, SO2x3, R6)
     auto r3(std::make_shared<ob::RealVectorStateSpace>(3)); // R^3 (position)
     auto so21(std::make_shared<ob::SO2StateSpace>());       // so2 (roll)
     auto so22(std::make_shared<ob::SO2StateSpace>());       // so2 (pitch)
     auto so23(std::make_shared<ob::SO2StateSpace>());       // so2 (yaw)
     auto r6(std::make_shared<ob::RealVectorStateSpace>(6)); // R^6 (position velocity, anguar velocity)
+    auto t(std::make_shared<ob::TimeStateSpace>());         // R (time)
 
     // Make State Space Bounds (so2 bounds allready fixed)
     ob::RealVectorBounds posbounds(3); // Position
@@ -271,7 +282,7 @@ void planWithSimpleSetup()
     r6->setBounds(velbounds);
 
     // Combine smaller spaces into big main space
-    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6;
+    ob::StateSpacePtr space = r3 + so21 + so22 + so23 + r6 + t;
 
     // create a control space
     auto cspace(std::make_shared<DemoControlSpace>(space));
