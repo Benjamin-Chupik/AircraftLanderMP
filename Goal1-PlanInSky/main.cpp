@@ -15,7 +15,6 @@ Axis Frame: NED (so z needs to be negative)
 // Program Setup
 //--------------------------------------------------------------------
 #include <ompl/control/SpaceInformation.h>
-// #include <ompl/extensions/ode/OpenDEStateSpace.h>
 #include <ompl/base/StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
@@ -39,6 +38,9 @@ Axis Frame: NED (so z needs to be negative)
 // Name Spaces
 namespace ob = ompl::base;
 namespace oc = ompl::control;
+
+// Constants
+const double maxAOA = 0.261799; // 15 deg in radians
 
 // Definition of the ODE
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
@@ -129,25 +131,19 @@ void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2));
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
-    // SO2.enforceBounds(result->as<ob::CompoundState>()[5].as<ob::SO2StateSpace::StateType>(0));
 }
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
+    // Unpack vectors
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+    double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
     double z = pos[2];
-    //    ob::ScopedState<ob::SE2StateSpace>
-    /*
-    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
 
-    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+    // Calculate angle of attack
+    double alpha = atan2(vel[2], vel[0]);
 
-    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-
-    // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
-    */
-    if (z > 0)
+    if (z > 0 || alpha > maxAOA)
     {
         return false;
     }
@@ -167,17 +163,13 @@ public:
 
 void planWithSimpleSetup()
 {
-    // auto space(std::make_shared<ob::SE3StateSpace>());
-    //  Make state space (R3, SO2x3, R6)
-    // ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3));
-    // auto r3(std::make_shared<ob::SE3StateSpace>());
-    auto r3(std::make_shared<ob::RealVectorStateSpace>(3));
-    // ob::StateSpacePtr so2(new ob::SO2StateSpace());
-    auto so21(std::make_shared<ob::SO2StateSpace>());
-    auto so22(std::make_shared<ob::SO2StateSpace>());
-    auto so23(std::make_shared<ob::SO2StateSpace>());
-    // ob::StateSpacePtr r6(new ob::RealVectorStateSpace(6));
-    auto r6(std::make_shared<ob::RealVectorStateSpace>(6));
+
+    // Make State Spaces
+    auto r3(std::make_shared<ob::RealVectorStateSpace>(3)); // R^3 (position)
+    auto so21(std::make_shared<ob::SO2StateSpace>());       // so2 (roll)
+    auto so22(std::make_shared<ob::SO2StateSpace>());       // so2 (pitch)
+    auto so23(std::make_shared<ob::SO2StateSpace>());       // so2 (yaw)
+    auto r6(std::make_shared<ob::RealVectorStateSpace>(6)); // R^6 (position velocity, anguar velocity)
 
     // Make Bounds
     ob::RealVectorBounds posbounds(3);
@@ -282,8 +274,6 @@ void planWithSimpleSetup()
     // ss.print();
 
     ob::PlannerStatus solved = ss.solve(2 * 60.0);
-
-    // std::cout << "NOT HERE **********************\n";
 
     if (solved)
     {
