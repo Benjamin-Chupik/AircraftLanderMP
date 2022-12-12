@@ -44,7 +44,8 @@ namespace oc = ompl::control;
 const double zmax = -0.2;
 double mu_ground = 0.6; // fricction coefficient on ground
 
-const double xdotgoal = 1;
+// Goal state
+
 const double zdotgoal = 2;
 
 // TODO: hard coded the wind thing
@@ -130,86 +131,12 @@ void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[11] = omega_body_dot[2];
 }
 
-void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
-{
-    /*
-    Void out y and z velocities so y and z body dosent change
-    x velocity is normal, but x acceleration is really negative untill its velocity is zero and then stops
-    */
-
-    // Turn relevant states into vectors
-    Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
-    Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
-    // Eigen::Vector3d vel_body{q[6], q[7], q[8]};
-    Eigen::Vector3d vel_body{q[6], 0, 0}; // Void
-    Eigen::Vector3d omega_body{q[9], q[10], q[11]};
-
-    // Kinematics
-    Eigen::Vector3d vel_inertial = TransformFromBodyToInertial(vel_body, euler_angles);
-    Eigen::Vector3d euler_rates = EulerRatesFromOmegaBody(omega_body, euler_angles);
-
-    // Allowing yaw correction on runway
-    struct params ap;
-
-    Eigen::Matrix3d inertia_matrix{
-        {ap.Ix, 0, ap.Ixz},
-        {0, ap.Iy, 0},
-        {-ap.Ixz, 0, ap.Iz}};
-
-    Eigen::Vector3d fa_body;
-    Eigen::Vector3d ma_body;
-    Eigen::Vector3d wind_angles;
-
-    double density = Formulae::barometricDensity(-pos_inertial[2]);
-    const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
-
-    // Pitch, roll and their derivatives set to 0
-    Eigen::Matrix<double, 12, 1> q_pert{q[0], q[1], q[2], q[3], 0, 0, q[6], q[7], q[8], q[9], 0, 0};
-    Eigen::Vector4d u_as_vec{0, 0, u[2], 0};
-
-    std::tie(fa_body, ma_body, wind_angles) = AeroForcesAndMoments_BodyState_WindCoeffs(q_pert, u_as_vec, wind_inertial, density);
-
-    Eigen::Vector3d omega_body_dot;
-    omega_body_dot = inertia_matrix.inverse() * ((-1 * omega_body.cross(inertia_matrix * omega_body)) + ma_body);
-    Eigen::Vector3d vel_body_dot;
-    Eigen::Vector3d fg_body;
-
-    Eigen::Vector3d grav_vec{(-sin(euler_angles[1])), (sin(euler_angles[0]) * cos(euler_angles[1])), (cos(euler_angles[0]) * cos(euler_angles[1]))};
-    fg_body = (ap.g * ap.m) * grav_vec;
-    vel_body_dot = (-1 * (omega_body.cross(vel_body))) + ((1 / ap.m) * (fg_body + fa_body));
-
-    // State Derivative
-    qdot[0] = vel_inertial[0];
-    qdot[1] = vel_inertial[1];
-    qdot[2] = 0;
-
-    qdot[3] = euler_rates[0];
-    qdot[4] = 0;
-    qdot[5] = 0;
-
-    qdot[6] = -ap.g * mu_ground + vel_body_dot[0];
-    qdot[7] = 0.0;
-    qdot[8] = 0.0;
-
-    qdot[9] = omega_body_dot[0];
-    qdot[10] = 0.0;
-    qdot[11] = 0.0;
-}
-
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // Update time component (does not change in either dynamics)
     qdot[12] = 1; // Time update
 
-    // If the z component is less than 0.5 meters its on the ground, y and z velocity is less than 0.5 m/s
-    if (q[2] > zmax) // && q[7] < fabs(0.5) && q[8] < fabs(0.5))
-    {
-        groundDynamics(q, control, qdot);
-    }
-    else
-    {
-        flightDynamics(q, control, qdot);
-    }
+    flightDynamics(q, control, qdot);
 }
 
 // This is a callback method invoked after numerical integration.
@@ -311,12 +238,13 @@ public:
         double dz = fabs(z);
 
         // Goal vectors
-        double velocity = sqrt(zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in);
-        double zPosNorm = sqrt(dz * dz);
-        double anglenorm = sqrt(pitch * pitch + roll * roll);
+        double Dvelocity = fabs(sqrt(zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in) - 10); // go 10 m/s
+        double zdotGoal = fabs(sqrt(zdot_in * zdot_in) - 1);
+        double zPosNorm = fabs(z + zmax);                    // at ground
+        double andgGoal = sqrt(roll * roll + pitch * pitch); // no roll
 
         // Goal weighting of vectors (more weight is more important)
-        return zPosNorm + velocity + 0.4 * anglenorm;
+        return zPosNorm + 2 * zdotGoal + 0.5 * Dvelocity + 2 * andgGoal;
     }
 };
 
@@ -417,7 +345,7 @@ void planWithSimpleSetup()
 
     // ss.print(); // Print the setup information
 
-    ob::PlannerStatus solved = ss.solve(20 * 60.0);
+    ob::PlannerStatus solved = ss.solve(10 * 60.0);
 
     // Displaying information
     if (solved)
