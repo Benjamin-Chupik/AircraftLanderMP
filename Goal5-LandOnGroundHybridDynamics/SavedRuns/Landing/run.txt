@@ -1,0 +1,28 @@
+    start[0] = -199;
+    start[1] = 0;
+    start[2] = -20;
+    // Angles
+    start[3] = 0;
+    start[4] = 0;
+    start[5] = 0;
+    // Velocity
+    start[6] = 15;
+    start[7] = 0;
+    start[8] = 0;
+    // Angular velocity
+    start[9] = 0;
+    start[10] = 0;
+    start[11] = 0;
+
+
+        // Goal vectors
+        double velocity = sqrt(zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in);
+        double zPosNorm = sqrt(dz * dz);
+        double anglenorm = sqrt(pitch * pitch + roll * roll);
+
+        // Goal weighting of vectors (more weight is more important)
+        return zPosNorm + velocity + 0.4 * anglenorm;
+
+
+Did not get exact solution
+20 min run
