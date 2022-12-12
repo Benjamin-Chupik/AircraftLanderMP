@@ -191,9 +191,9 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[7] = 0.0;
     qdot[8] = 0.0;
 
-    qdot[9] = omega_body_dot[0];
+    qdot[9] = 0.0;
     qdot[10] = 0.0;
-    qdot[11] = 0.0;
+    qdot[11] = omega_body_dot[2];
 }
 
 void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
