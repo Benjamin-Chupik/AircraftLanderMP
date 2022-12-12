@@ -18,7 +18,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import sqrt
 
-isSave = False
+isSave = True
 
 dt = 0.1  # From the C++ stuff
 

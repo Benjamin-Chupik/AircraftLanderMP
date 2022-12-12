@@ -187,7 +187,7 @@ void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[4] = 0;
     qdot[5] = 0;
 
-    qdot[6] = -ap.g*mu_ground + vel_body_dot[0];
+    qdot[6] = -ap.g * mu_ground + vel_body_dot[0];
     qdot[7] = 0.0;
     qdot[8] = 0.0;
 
@@ -232,19 +232,17 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     double x = pos[0];
     double y = pos[1];
     double z = pos[2];
-    
 
     double yaw = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
     double pitch = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
     double roll = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
 
-    
     // Limiting angle of attack
     double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-    double alpha = atan2(vel[2],vel[0]);
+    double alpha = atan2(vel[2], vel[0]);
 
-    Eigen::Vector3d eu_angles {yaw, pitch, roll};
-	Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
+    Eigen::Vector3d eu_angles{yaw, pitch, roll};
+    Eigen::Vector3d vel_states{vel[0], vel[1], vel[2]};
     Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
 
     if (z > 0 || alpha > maxAOA)
@@ -253,15 +251,19 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     }
     else
     {
-        if (z > zmax){
-            if (vel_inert[2] < zdotgoal){ //&& vel_inert[2] < zdotgoal
-            return true;
+        if (z > zmax)
+        {
+            if (vel_inert[2] < zdotgoal)
+            { //&& vel_inert[2] < zdotgoal
+                return true;
             }
-            else{
+            else
+            {
                 return false;
             }
         }
-        else{
+        else
+        {
             return true;
         }
     }
@@ -298,8 +300,8 @@ public:
 
         // Break the state apart into components (velocity)
         double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-        Eigen::Vector3d eu_angles {yaw, pitch, roll};
-        Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
+        Eigen::Vector3d eu_angles{yaw, pitch, roll};
+        Eigen::Vector3d vel_states{vel[0], vel[1], vel[2]};
         Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
 
         double xdot_in = vel_inert[0];
@@ -415,7 +417,7 @@ void planWithSimpleSetup()
 
     // ss.print(); // Print the setup information
 
-    ob::PlannerStatus solved = ss.solve(5 * 60.0);
+    ob::PlannerStatus solved = ss.solve(20 * 60.0);
 
     // Displaying information
     if (solved)
