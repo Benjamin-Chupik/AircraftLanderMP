@@ -17,6 +17,7 @@ from mpl_toolkits import mplot3d
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import sqrt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 isSave = False
 
@@ -97,20 +98,28 @@ def main():
     ax = plt.axes(projection="3d")
     fig.tight_layout()
 
-    ax.plot(x, y, z, color='red')
-    sc = ax.scatter(x, y, z, cmap='hot', c=geo_velocity)
-    ax.scatter(x[0], y[0], z[0], c='blue')
-    ax.scatter(x[-1], y[-1], z[-1], c='green')
+    ax.plot(x, y, z, color='red', zorder=5)
+    sc = ax.scatter(x, y, z, cmap='hot', c=geo_velocity,  zorder=5)
+    ax.scatter(x[0], y[0], z[0], c='blue', zorder=5)
+    ax.scatter(x[-1], y[-1], z[-1], c='green', zorder=5)
     ax.set_xlabel("x Position")
     ax.set_ylabel("y Position")
     ax.set_zlabel("z Position")
     set_axes_equal(ax)
-    fig.colorbar(sc, label='Velocity')
+    xr = [-10,10,10,-10]
+    yr = [0,-0,100,100]
+    zr = [0,0,0,0]
+
+    verts = [list(zip(xr,yr,zr))]
+    coll = Poly3DCollection(verts)
+    ax.add_collection3d(coll)
+    
+    fig.colorbar(sc, label=r'Velocity $[\frac{m}{s}]$')
     if isSave:
         fig.canvas.manager.full_screen_toggle()  # toggle fullscreen mode
         plt.savefig("3DPlot.png")
 
-    # Position Plots
+    #Position Plots
 
     fig, axs = plt.subplots(3)
     fig.tight_layout()

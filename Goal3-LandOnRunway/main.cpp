@@ -44,27 +44,28 @@ namespace oc = ompl::control;
 
 Eigen::Vector3d wind_inertial{0, 0, 0};
 
-//
-double max_alpha = 0.261799; //15 deg in rad
-double mu_ground = 0.7; // fricction coefficient on ground
+//  
+const double max_alpha = 0.261799; //15 deg in rad
+const double goalvel = 10;
+const double goalyaw = 1.57079632679; //90 deg
+const double maxroll = 2*0.0872665;// 10 deg
 
 // Runway limits
-const double xmin = -80;
-const double xmax = 120;
+const double xmin = -10;
+const double xmax = 10;
 
 const double ymin = 0;
 const double ymax = 100;
 
-const double zmax = -0.2;
 
-const double xdotgoal = 1;
-const double zdotgoal = 2;
+const double zgoal = -0.2;
+const double zdotgoal = 1;
 
 // Definition of the ODE
-void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
+void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
 {
     // TODO: hard coded the wind thing
-
+    qdot[12] = 1; // Time update
     // TempestODE - This function adapted for c++ from function provided by Professor Eric Frew. Adapted by Roland Ilyes
 
     // load in tempest aircraft parameters
@@ -138,88 +139,6 @@ void flightDynamics(const oc::ODESolver::StateType &q, const oc::Control *contro
     qdot[11] = omega_body_dot[2];
 }
 
-void groundDynamics(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
-{
-    /*
-    Void out y and z velocities so y and z body dosent change
-    x velocity is normal, but x acceleration is really negative untill its velocity is zero and then stops
-    */
-
-    // Turn relevant states into vectors
-    Eigen::Vector3d pos_inertial{q[0], q[1], q[2]};
-    Eigen::Vector3d euler_angles{q[3], q[4], q[5]};
-    // Eigen::Vector3d vel_body{q[6], q[7], q[8]};
-    Eigen::Vector3d vel_body{q[6], 0, 0}; // Void
-    Eigen::Vector3d omega_body{q[9], q[10], q[11]};
-
-    // Kinematics
-    Eigen::Vector3d vel_inertial = TransformFromBodyToInertial(vel_body, euler_angles);
-    Eigen::Vector3d euler_rates = EulerRatesFromOmegaBody(omega_body, euler_angles);
-
-    // Allowing yaw correction on runway
-    struct params ap;
-
-    Eigen::Matrix3d inertia_matrix{
-        {ap.Ix, 0, ap.Ixz},
-        {0, ap.Iy, 0},
-        {-ap.Ixz, 0, ap.Iz}};
-
-    Eigen::Vector3d fa_body;
-    Eigen::Vector3d ma_body;
-    Eigen::Vector3d wind_angles;
-
-    double density = Formulae::barometricDensity(-pos_inertial[2]);
-    const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
-
-    // Pitch, roll and their derivatives set to 0
-    Eigen::Matrix<double, 12, 1> q_pert{q[0], q[1], q[2], q[3], 0, 0, q[6], q[7], q[8], q[9], 0, 0};
-    Eigen::Vector4d u_as_vec{0, 0, u[2], 0};
-
-    std::tie(fa_body, ma_body, wind_angles) = AeroForcesAndMoments_BodyState_WindCoeffs(q_pert, u_as_vec, wind_inertial, density);
-
-    Eigen::Vector3d omega_body_dot;
-    omega_body_dot = inertia_matrix.inverse() * ((-1 * omega_body.cross(inertia_matrix * omega_body)) + ma_body);
-
-    Eigen::Vector3d vel_body_dot;
-    Eigen::Vector3d fg_body;
-
-    Eigen::Vector3d grav_vec{(-sin(euler_angles[1])), (sin(euler_angles[0]) * cos(euler_angles[1])), (cos(euler_angles[0]) * cos(euler_angles[1]))};
-    fg_body = (ap.g * ap.m) * grav_vec;
-    vel_body_dot = (-1 * (omega_body.cross(vel_body))) + ((1 / ap.m) * (fg_body + fa_body));
-
-    // State Derivative
-    qdot[0] = vel_inertial[0];
-    qdot[1] = vel_inertial[1];
-    qdot[2] = 0;
-
-    qdot[3] = euler_rates[0];
-    qdot[4] = 0;
-    qdot[5] = 0;
-
-    qdot[6] = -ap.g * mu_ground + vel_body_dot[0];
-    qdot[7] = 0.0;
-    qdot[8] = 0.0;
-
-    qdot[9] = omega_body_dot[0];
-    qdot[10] = 0.0;
-    qdot[11] = 0.0;
-}
-
-void TempestODE(const oc::ODESolver::StateType &q, const oc::Control *control, oc::ODESolver::StateType &qdot)
-{
-    // Update time component (does not change in either dynamics)
-    qdot[12] = 1; // Time update
-
-    // If the z component is less than 0.5 meters its on the ground
-    if (q[2] > zmax)
-    {
-        groundDynamics(q, control, qdot);
-    }
-    else
-    {
-        flightDynamics(q, control, qdot);
-    }
-}
 
 // This is a callback method invoked after numerical integration.
 void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*/, const double /*duration*/, ob::State *result)
@@ -234,24 +153,6 @@ void PostIntegration(const ob::State * /*state*/, const oc::Control * /*control*
     SO2.enforceBounds(result->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3));
 }
 
-// Function to ensure smooth landing hopefully :)
-/*
-bool decentdescent(double z, double zdot)
-    {
-         double a = log(6)/10;
-        if (z > -10){
-         if(zdot - zdotgoal < exp(a*-(z-zmax))-1 && zdot>0){
-            return true;
-         }
-         else{
-            return false;
-         }
-         }
-         else{
-            return true;
-         }
-    }
-*/
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
 {
     double *pos = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
@@ -259,51 +160,19 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
     double y = pos[1];
     double z = pos[2];
     
-
-    double roll = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
-    double pitch = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
-    double yaw = state->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
-
-    
     // Limiting angle of attack
     double *vel = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
     double alpha = atan2(vel[2], vel[0]);
-
-    Eigen::Vector3d eu_angles {roll, pitch, yaw};
-	Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
-    Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
-    //    ob::ScopedState<ob::SE2StateSpace>
-    /*
-    const auto *se3state = state->as<ob::SE3StateSpace::StateType>();
-
-    const auto *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
-    const auto *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-
+    
     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-    return si->satisfiesBounds(state) && (const void *)rot != (const void *)pos;
-    */
+    
     if (z > 0 || alpha > max_alpha) // || !decentdescent(z, vel_inert[2])
     {
         return false;
     }
     else
     {
-        if (z > zmax)
-        {
-            if (xmin < x && x < xmax && ymin < y && y < ymax && vel_inert[2] < zdotgoal)
-            { //&& vel_inert[2] < zdotgoal
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        else
-        {
-            return true;
-        }
+        return true;
     }
 }
 
@@ -321,7 +190,7 @@ class CustomGoal : public ob::GoalRegion
     public:
         CustomGoal(const ob::SpaceInformationPtr &si) : ob::GoalRegion(si)
         {
-            threshold_ = 5;
+            threshold_ = 1;
         }
 
     double distanceGoal(const ob::State *st) const override
@@ -336,22 +205,28 @@ class CustomGoal : public ob::GoalRegion
         double y = pos[1];
         double z = pos[2];
 
-            double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
-            double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
-            double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
-    
-            double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
-            Eigen::Vector3d eu_angles {roll, pitch, yaw};
-            Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
-            Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
+        double roll = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(1)->value;
+        double pitch = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(2)->value;
+        double yaw = st->as<ob::CompoundState>()->as<ob::SO2StateSpace::StateType>(3)->value;
+
+        double *vel = st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(4)->values;
+        Eigen::Vector3d eu_angles {roll, pitch, yaw};
+        Eigen::Vector3d vel_states {vel[0], vel[1], vel[2]};
+        Eigen::Vector3d vel_inert = TransformFromBodyToInertial(vel_states, eu_angles);
 
         double xdot_in = vel_inert[0];
         double ydot_in = vel_inert[1];
         double zdot_in = vel_inert[2];
 
+        // position norms
         double dx;
         double dy;
         double dz;
+
+        // angle norms
+        double droll;
+        double dyaw;
+        double dpitch;
 
         // Runway limits
 
@@ -364,44 +239,41 @@ class CustomGoal : public ob::GoalRegion
             dx = fmin(fabs(x - xmin), fabs(x - xmax));
         }
 
-            if (ymin < y && y < ymax){
-                dy = 0;
-            }
-            else{
-                dy = fmin(fabs(y-ymin), fabs(y+ymax));
-            }
-            /*
-            if (z > zmax){
-                dz = 0;
-                zdot_in = 0;
-            }
-            else{
-                dz = fabs(z);
-            }
-
-            if (xdot_in < xdotgoal){
-                xdot_in = 0;
-            }
-            */
-            if (z > zmax){
-                dz = 0;
-            }
-            else{
-                dz = 5*fabs(z);
-
-            double velocity = sqrt(3*zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in);
-            double runwaynorm = sqrt(dx*dx + dy*dy+ dz*dz);
-            double anglenorm;
-
-            double goalyaw = 1.57;
-            anglenorm = sqrt(pitch*pitch + roll*roll + 10*fabs(yaw-goalyaw));
-            
-            
-
-            return runwaynorm + velocity + anglenorm;
+        if (ymin < y && y < ymax){
+            dy = 0;
         }
+        else{
+
+            dy = fmin(fabs(y-ymin), fabs(y+ymax));
         }
-    };
+        if (-maxroll < roll && roll < maxroll){
+            droll = 0;
+        }
+        else{
+
+            droll = 3*fmin(fabs(roll-maxroll), fabs(roll+maxroll));
+        }
+        if (pitch>0){
+
+            dpitch = 0;
+        }
+        else{
+            dpitch = fabs(pitch);
+        }
+        
+        dz = 3*fabs(z-zgoal);
+        dyaw = 10*fabs(yaw-goalyaw);
+        
+
+        double velocity = fabs(sqrt(zdot_in * zdot_in + ydot_in * ydot_in + xdot_in * xdot_in)-2*goalvel);
+        double runwaynorm = sqrt(dx*dx + dy*dy+ dz*dz);
+        double anglenorm = sqrt(droll*droll + dyaw * dyaw + dpitch * dpitch);
+        double crashnorm = fabs(zdot_in-zdotgoal);
+        
+        return runwaynorm + velocity + anglenorm + crashnorm;
+        }
+        };
+
 void planWithSimpleSetup()
 {
     // auto space(std::make_shared<ob::SE3StateSpace>());
@@ -418,10 +290,10 @@ void planWithSimpleSetup()
     ob::RealVectorBounds velbounds(6); // Velocities
     // Position bounds
     posbounds.setLow(0, -100); // x
-    posbounds.setHigh(0, 120); // x
+    posbounds.setHigh(0, 100); // x
     posbounds.setLow(1, -100);  // y
     posbounds.setHigh(1, 100);  // y
-    posbounds.setLow(2, -25);  // z
+    posbounds.setLow(2, -50);  // z
     posbounds.setHigh(2, 0);   // z
     r3->setBounds(posbounds);  // set the bounds
     // Velocity bounds
@@ -446,7 +318,7 @@ void planWithSimpleSetup()
     cbounds.setLow(2, -.4);
     cbounds.setHigh(2, .4);
 
-    cbounds.setLow(3, -1.7);
+    cbounds.setLow(3, -.7);
     cbounds.setHigh(3, .7);
 
     cspace->setBounds(cbounds);
@@ -475,14 +347,14 @@ void planWithSimpleSetup()
     start.random();
     // Position
     start[0] = -100;
-    start[1] = -100;
-    start[2] = -25;
+    start[1] =  -100;
+    start[2] = -15;
     // Angles
     start[3] = 0;
     start[4] = 0;
-    start[5] = 0;
+    start[5] = goalyaw/2;
     // Velocity
-    start[6] = 15;
+    start[6] = 12;
     start[7] = 0;
     start[8] = 0;
     // Angular velocity
@@ -503,7 +375,7 @@ void planWithSimpleSetup()
 
     // ss.print(); // Print the setup information
 
-    ob::PlannerStatus solved = ss.solve(5 * 60.0);
+    ob::PlannerStatus solved = ss.solve(20 * 60.0);
 
     // Displaying information
     if (solved)
